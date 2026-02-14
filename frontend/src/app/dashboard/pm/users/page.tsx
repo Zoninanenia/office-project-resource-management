@@ -8,6 +8,7 @@ export default function UserManagementPage() {
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [search, setSearch] = useState('');
     const [showCreateModal, setShowCreateModal] = useState(false);
 
     // New User Form State
@@ -38,7 +39,6 @@ export default function UserManagementPage() {
     const handleRoleChange = async (userId: number, newRole: UserRole) => {
         try {
             await api.put(`/users/${userId}/role`, { role: newRole });
-            // Update local state
             setUsers(users.map(u => u.userId === userId ? { ...u, role: newRole } : u));
         } catch (err: any) {
             alert(err.message || 'Failed to update role');
@@ -50,8 +50,7 @@ export default function UserManagementPage() {
         try {
             await api.post('/users', newUser);
             setShowCreateModal(false);
-            fetchUsers(); // Refresh list
-            // Reset form
+            fetchUsers();
             setNewUser({
                 username: '',
                 email: '',
@@ -65,355 +64,196 @@ export default function UserManagementPage() {
         }
     };
 
-    // Team Setup State
-    const [showTeamModal, setShowTeamModal] = useState(false);
-    const [teamStep, setTeamStep] = useState(1); // 1: Create Team, 2: Add Leader, 3: Add Workers
-    const [teamData, setTeamData] = useState({
-        name: '',
-        projectId: '',
-        leaderId: '',
-        workerIds: [] as string[],
-    });
-    const [projects, setProjects] = useState<any[]>([]);
+    // Filter Users
+    const filteredUsers = users.filter(u =>
+        u.username.toLowerCase().includes(search.toLowerCase()) ||
+        u.email.toLowerCase().includes(search.toLowerCase()) ||
+        (u.firstName?.toLowerCase() || '').includes(search.toLowerCase())
+    );
 
-    useEffect(() => {
-        if (showTeamModal) {
-            fetchProjects();
-        }
-    }, [showTeamModal]);
-
-    const fetchProjects = async () => {
-        try {
-            const data = await api.get<any[]>('/projects');
-            setProjects(data);
-        } catch (err) {
-            console.error('Failed to fetch projects');
-        }
-    };
-
-    const handleCreateTeam = async () => {
-        try {
-            const res = await api.post<any>('/teams', {
-                teamName: teamData.name,
-                projectId: teamData.projectId,
-            });
-            return res.teamId; // Assuming backend returns the created team object
-        } catch (err: any) {
-            alert(err.message || 'Failed to create team');
-            return null;
-        }
-    };
-
-    const handleAddMember = async (teamId: number, userId: string, role: string) => {
-        try {
-            await api.post(`/teams/${teamId}/members`, { userId, role });
-        } catch (err: any) {
-            console.error(`Failed to add user ${userId} as ${role}`, err);
-        }
-    };
-
-    const handleTeamSubmit = async () => {
-        // 1. Create Team
-        const teamId = await handleCreateTeam();
-        if (!teamId) return;
-
-        // 2. Add Leader
-        if (teamData.leaderId) {
-            await handleAddMember(teamId, teamData.leaderId, 'leader');
-            // Update logic to also update user role if needed? The requirement says "add team leader", implies assigning role in team. 
-            // But also might imply updating User role in Users table. Let's do both or assume team role is enough. 
-            // For now, let's also update the global user role to ensure consistency if that's the model.
-            await handleRoleChange(parseInt(teamData.leaderId), 'team_leader');
-        }
-
-        // 3. Add Workers
-        for (const workerId of teamData.workerIds) {
-            await handleAddMember(teamId, workerId, 'member');
-            await handleRoleChange(parseInt(workerId), 'worker');
-        }
-
-        setShowTeamModal(false);
-        setTeamStep(1);
-        setTeamData({ name: '', projectId: '', leaderId: '', workerIds: [] });
-        fetchUsers(); // Refresh to show updated roles
-        alert('Team created and members assigned successfully!');
-    };
-
-    if (loading) return <div>Loading...</div>;
-    if (error) return <div className="text-red-500">{error}</div>;
+    if (loading) return (
+        <div className="flex items-center justify-center h-[500px]">
+            <div className="w-16 h-16 border-4 border-brand-cyan border-t-brand-teal rounded-full animate-spin"></div>
+        </div>
+    );
 
     return (
-        <div>
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold text-gray-800 dark:text-white">User Management</h1>
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => setShowTeamModal(true)}
-                        className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
-                    >
-                        Setup Team
-                    </button>
+        <div className="space-y-8">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-black text-gray-800 dark:text-white tracking-tight leading-tiht">User Management</h1>
+                    <p className="text-gray-500 dark:text-gray-400 font-medium">Overview of all team members and roles.</p>
+                </div>
+
+                <div className="flex gap-4 w-full md:w-auto">
+                    <div className="relative group w-full md:w-64">
+                        <input
+                            type="text"
+                            placeholder="Find user..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="pl-10 pr-4 py-2.5 w-full bg-white dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 rounded-xl font-bold text-gray-700 dark:text-white outline-none focus:border-brand-cyan transition-all shadow-sm"
+                        />
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                            <SearchIcon className="w-5 h-5" />
+                        </div>
+                    </div>
+
                     <button
                         onClick={() => setShowCreateModal(true)}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded"
+                        className="px-6 py-2.5 bg-brand-cyan hover:bg-cyan-400 text-white font-bold rounded-xl shadow-lg shadow-cyan-500/30 transition-all flex items-center justify-center whitespace-nowrap"
                     >
-                        Add User
+                        + Add User
                     </button>
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead className="bg-gray-50 dark:bg-gray-700">
-                        <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">User</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Email</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Role</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                        {users.map((user) => (
-                            <tr key={user.userId}>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="flex items-center">
-                                        <div>
-                                            <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                                {user.firstName} {user.lastName}
-                                            </div>
-                                            <div className="text-sm text-gray-500 dark:text-gray-400">@{user.username}</div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                    {user.email}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                    ${user.role === 'project_manager' ? 'bg-purple-100 text-purple-800' :
-                                            user.role === 'team_leader' ? 'bg-blue-100 text-blue-800' :
-                                                user.role === 'worker' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                                        {user.role}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                    <select
-                                        value={user.role}
-                                        onChange={(e) => handleRoleChange(user.userId, e.target.value as UserRole)}
-                                        className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
-                                    >
-                                        <option value="user">User</option>
-                                        <option value="worker">Worker</option>
-                                        <option value="team_leader">Team Leader</option>
-                                        <option value="project_manager">Project Manager</option>
-                                    </select>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+            {/* Users Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {filteredUsers.map((user) => (
+                    <div key={user.userId} className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-md border-b-4 border-gray-100 dark:border-gray-700 hover:border-brand-cyan hover:-translate-y-1 transition-all flex flex-col items-center text-center group relative overflow-hidden">
 
-            {/* Create User Modal */}
-            {showCreateModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
-                        <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Create New User</h2>
-                        <form onSubmit={handleCreateUser} className="space-y-4">
-                            <input
-                                type="text"
-                                placeholder="Username"
-                                value={newUser.username}
-                                onChange={e => setNewUser({ ...newUser, username: e.target.value })}
-                                className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                                required
-                            />
-                            <input
-                                type="email"
-                                placeholder="Email"
-                                value={newUser.email}
-                                onChange={e => setNewUser({ ...newUser, email: e.target.value })}
-                                className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                                required
-                            />
-                            <input
-                                type="password"
-                                placeholder="Password"
-                                value={newUser.password}
-                                onChange={e => setNewUser({ ...newUser, password: e.target.value })}
-                                className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                                required
-                            />
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    placeholder="First Name"
-                                    value={newUser.firstName}
-                                    onChange={e => setNewUser({ ...newUser, firstName: e.target.value })}
-                                    className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                                />
-                                <input
-                                    type="text"
-                                    placeholder="Last Name"
-                                    value={newUser.lastName}
-                                    onChange={e => setNewUser({ ...newUser, lastName: e.target.value })}
-                                    className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                                />
+                        {/* Role Color Stripe top */}
+                        <div className={`absolute top-0 left-0 right-0 h-1.5 
+                            ${user.role === 'project_manager' ? 'bg-brand-peach' :
+                                user.role === 'team_leader' ? 'bg-brand-cyan' :
+                                    user.role === 'worker' ? 'bg-brand-sage' : 'bg-gray-300'
+                            }`}>
+                        </div>
+
+                        <div className="w-20 h-20 rounded-full bg-gray-50 dark:bg-gray-700 p-1 mb-4 shadow-inner">
+                            <div className={`w-full h-full rounded-full flex items-center justify-center text-2xl font-black uppercase
+                                ${user.role === 'project_manager' ? 'bg-brand-peach text-white' :
+                                    user.role === 'team_leader' ? 'bg-brand-cyan text-white' :
+                                        user.role === 'worker' ? 'bg-brand-sage text-white' : 'bg-gray-400 text-white'
+                                }`}>
+                                {user.firstName ? user.firstName.charAt(0) : user.username.charAt(0)}
                             </div>
+                        </div>
+
+                        <h3 className="font-bold text-gray-900 dark:text-white text-lg">{user.firstName} {user.lastName}</h3>
+                        <p className="text-gray-400 dark:text-gray-500 text-xs font-bold mb-4 uppercase tracking-widest">@{user.username}</p>
+
+                        <div className="mb-6">
+                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${user.role === 'project_manager' ? 'bg-brand-peach/10 text-brand-peach' :
+                                user.role === 'team_leader' ? 'bg-brand-cyan/10 text-brand-cyan' :
+                                    user.role === 'worker' ? 'bg-brand-sage/10 text-brand-sage' :
+                                        'bg-gray-100 dark:bg-gray-700 text-gray-500'
+                                }`}>
+                                {user.role.replace('_', ' ')}
+                            </span>
+                        </div>
+
+                        <div className="w-full mt-auto">
                             <select
-                                value={newUser.role}
-                                onChange={e => setNewUser({ ...newUser, role: e.target.value as UserRole })}
-                                className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                value={user.role}
+                                onChange={(e) => handleRoleChange(user.userId, e.target.value as UserRole)}
+                                className="w-full py-2 px-3 bg-gray-50 dark:bg-gray-900 border-none rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-cyan cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                             >
                                 <option value="user">User</option>
                                 <option value="worker">Worker</option>
                                 <option value="team_leader">Team Leader</option>
                                 <option value="project_manager">Project Manager</option>
                             </select>
-
-                            <div className="flex justify-end gap-2 mt-4">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowCreateModal(false)}
-                                    className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-                                >
-                                    Create User
-                                </button>
-                            </div>
-                        </form>
+                        </div>
                     </div>
-                </div>
-            )}
+                ))}
+            </div>
 
-            {/* Team Setup Modal */}
-            {showTeamModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-lg">
+            {/* Create User Modal */}
+            {showCreateModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+                    <div className="bg-white dark:bg-gray-900 rounded-3xl p-8 w-full max-w-md shadow-2xl scale-100">
                         <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                                Setup Team (Step {teamStep}/3)
-                            </h2>
-                            <button onClick={() => setShowTeamModal(false)} className="text-gray-500 hover:text-gray-700">
+                            <h2 className="text-2xl font-black text-gray-900 dark:text-white">Create New User</h2>
+                            <button onClick={() => setShowCreateModal(false)} className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-500 hover:bg-red-100 hover:text-red-500 transition-colors">
                                 &times;
                             </button>
                         </div>
 
-                        {/* Step 1: Create Team */}
-                        {teamStep === 1 && (
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Team Name</label>
+                        <form onSubmit={handleCreateUser} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Account Info</label>
+                                <div className="space-y-2">
                                     <input
                                         type="text"
-                                        value={teamData.name}
-                                        onChange={e => setTeamData({ ...teamData, name: e.target.value })}
-                                        className="mt-1 w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                                        placeholder="e.g. Frontend Team"
+                                        placeholder="Username"
+                                        value={newUser.username}
+                                        onChange={e => setNewUser({ ...newUser, username: e.target.value })}
+                                        className="w-full p-3 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-brand-cyan rounded-xl font-medium outline-none transition-all dark:text-white"
+                                        required
+                                    />
+                                    <input
+                                        type="email"
+                                        placeholder="Email"
+                                        value={newUser.email}
+                                        onChange={e => setNewUser({ ...newUser, email: e.target.value })}
+                                        className="w-full p-3 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-brand-cyan rounded-xl font-medium outline-none transition-all dark:text-white"
+                                        required
+                                    />
+                                    <input
+                                        type="password"
+                                        placeholder="Password"
+                                        value={newUser.password}
+                                        onChange={e => setNewUser({ ...newUser, password: e.target.value })}
+                                        className="w-full p-3 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-brand-cyan rounded-xl font-medium outline-none transition-all dark:text-white"
+                                        required
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Project</label>
-                                    <select
-                                        value={teamData.projectId}
-                                        onChange={e => setTeamData({ ...teamData, projectId: e.target.value })}
-                                        className="mt-1 w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                                    >
-                                        <option value="">Select Project</option>
-                                        {projects.map(p => (
-                                            <option key={p.projectId} value={p.projectId}>{p.title}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div className="flex justify-end mt-4">
-                                    <button
-                                        onClick={() => setTeamStep(2)}
-                                        disabled={!teamData.name || !teamData.projectId}
-                                        className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
-                                    >
-                                        Next: Add Leader
-                                    </button>
-                                </div>
                             </div>
-                        )}
 
-                        {/* Step 2: Add Leader */}
-                        {teamStep === 2 && (
-                            <div className="space-y-4">
-                                <p className="text-sm text-gray-600 dark:text-gray-400">Select a user to be the Team Leader.</p>
-                                <select
-                                    value={teamData.leaderId}
-                                    onChange={e => setTeamData({ ...teamData, leaderId: e.target.value })}
-                                    className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                                    size={5}
-                                >
-                                    {users.filter(u => u.role !== 'project_manager').map(u => (
-                                        <option key={u.userId} value={u.userId}>
-                                            {u.firstName} {u.lastName} (@{u.username})
-                                        </option>
-                                    ))}
-                                </select>
-                                <div className="flex justify-between mt-4">
-                                    <button
-                                        onClick={() => setTeamStep(1)}
-                                        className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
-                                    >
-                                        Back
-                                    </button>
-                                    <button
-                                        onClick={() => setTeamStep(3)}
-                                        disabled={!teamData.leaderId}
-                                        className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
-                                    >
-                                        Next: Add Workers
-                                    </button>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Profile Details</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <input
+                                        type="text"
+                                        placeholder="First Name"
+                                        value={newUser.firstName}
+                                        onChange={e => setNewUser({ ...newUser, firstName: e.target.value })}
+                                        className="w-full p-3 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-brand-cyan rounded-xl font-medium outline-none transition-all dark:text-white"
+                                    />
+                                    <input
+                                        type="text"
+                                        placeholder="Last Name"
+                                        value={newUser.lastName}
+                                        onChange={e => setNewUser({ ...newUser, lastName: e.target.value })}
+                                        className="w-full p-3 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-brand-cyan rounded-xl font-medium outline-none transition-all dark:text-white"
+                                    />
                                 </div>
                             </div>
-                        )}
 
-                        {/* Step 3: Add Workers */}
-                        {teamStep === 3 && (
-                            <div className="space-y-4">
-                                <p className="text-sm text-gray-600 dark:text-gray-400">Select workers for this team (Hold Ctrl/Cmd to select multiple).</p>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Assign Role</label>
                                 <select
-                                    multiple
-                                    value={teamData.workerIds}
-                                    onChange={e => {
-                                        const selected = Array.from(e.target.selectedOptions, option => option.value);
-                                        setTeamData({ ...teamData, workerIds: selected });
-                                    }}
-                                    className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white h-40"
+                                    value={newUser.role}
+                                    onChange={e => setNewUser({ ...newUser, role: e.target.value as UserRole })}
+                                    className="w-full p-3 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-brand-cyan rounded-xl font-bold outline-none transition-all dark:text-white cursor-pointer"
                                 >
-                                    {users.filter(u => u.userId.toString() !== teamData.leaderId && u.role !== 'project_manager').map(u => (
-                                        <option key={u.userId} value={u.userId}>
-                                            {u.firstName} {u.lastName} (@{u.username})
-                                        </option>
-                                    ))}
+                                    <option value="user">User</option>
+                                    <option value="worker">Worker</option>
+                                    <option value="team_leader">Team Leader</option>
+                                    <option value="project_manager">Project Manager</option>
                                 </select>
-                                <div className="flex justify-between mt-4">
-                                    <button
-                                        onClick={() => setTeamStep(2)}
-                                        className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
-                                    >
-                                        Back
-                                    </button>
-                                    <button
-                                        onClick={handleTeamSubmit}
-                                        className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-                                    >
-                                        Create Team & Assign Members
-                                    </button>
-                                </div>
                             </div>
-                        )}
+
+                            <button
+                                type="submit"
+                                className="w-full py-4 mt-4 bg-brand-cyan hover:bg-cyan-400 text-white font-black rounded-xl shadow-lg hover:shadow-cyan-500/30 transform hover:-translate-y-1 transition-all"
+                            >
+                                Create User Account
+                            </button>
+                        </form>
                     </div>
                 </div>
             )}
         </div>
     );
+}
+
+function SearchIcon({ className }: { className?: string }) {
+    return (
+        <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+    )
 }

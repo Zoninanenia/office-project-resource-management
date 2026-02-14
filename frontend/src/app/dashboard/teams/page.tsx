@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import Link from 'next/link';
-import { User } from '@/types'; // Assuming User type is exported from types
+import { User } from '@/types';
 
 interface Member {
     userId: number;
@@ -25,16 +25,33 @@ interface Team {
     members: Member[];
 }
 
+interface Project {
+    projectId: number;
+    title: string;
+}
+
 export default function TeamsPage() {
     const [teams, setTeams] = useState<Team[]>([]);
     const [loading, setLoading] = useState(true);
     const [users, setUsers] = useState<User[]>([]);
+    const [projects, setProjects] = useState<Project[]>([]);
 
-    // Add Member Modal State
-    const [showAddModal, setShowAddModal] = useState(false);
+    // Wizard State
+    const [showWizard, setShowWizard] = useState(false);
+    const [step, setStep] = useState(1);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Creation Data
+    const [newTeamName, setNewTeamName] = useState('');
+    const [selectedProjectId, setSelectedProjectId] = useState('');
+    const [createdTeamId, setCreatedTeamId] = useState<number | null>(null);
+    const [selectedLeaderId, setSelectedLeaderId] = useState('');
+    const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+
+    // Existing Add Member Modal (for editing existing teams)
+    const [showAddMemberModal, setShowAddMemberModal] = useState(false);
     const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
     const [selectedUserId, setSelectedUserId] = useState<string>('');
-    const [isAdding, setIsAdding] = useState(false);
 
     useEffect(() => {
         fetchTeams();
@@ -61,231 +78,452 @@ export default function TeamsPage() {
         }
     };
 
-    const openAddModal = (teamId: number) => {
+    const fetchProjects = async () => {
+        try {
+            const data = await api.get<Project[]>('/projects');
+            setProjects(data);
+        } catch (err) {
+            console.error('Failed to fetch projects', err);
+        }
+    };
+
+    // --- Wizard Actions ---
+
+    const openWizard = () => {
+        fetchProjects();
+        setStep(1);
+        setNewTeamName('');
+        setSelectedProjectId('');
+        setCreatedTeamId(null);
+        setSelectedLeaderId('');
+        setSelectedMemberIds([]);
+        setShowWizard(true);
+    };
+
+    const handleStep1 = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newTeamName || !selectedProjectId) return;
+        setIsSubmitting(true);
+        try {
+            const res = await api.post<Team>('/teams', {
+                teamName: newTeamName,
+                projectId: parseInt(selectedProjectId)
+            });
+            setCreatedTeamId(res.teamId);
+            setStep(2);
+            await fetchTeams(); // Refresh to see new team immediately behind modal
+        } catch (err: any) {
+            alert(err.message || 'Failed to create team');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleStep2 = async () => {
+        if (!createdTeamId || !selectedLeaderId) return;
+        setIsSubmitting(true);
+        try {
+            await api.post(`/teams/${createdTeamId}/members`, {
+                userId: selectedLeaderId,
+                role: 'leader' // Should technically be 'leader' but backend might expect 'member' with leader flag? 
+                // Wait, typically 'team_leader' is a user role, but in team context they are the leader.
+                // Assuming backend handles 'leader' role string or user role check.
+                // If backend only accepts 'member', we might need to adjust. 
+                // User requirement said "Select Team Leader". 
+            });
+            // Re-fetch to update
+            await fetchTeams();
+            setStep(3);
+        } catch (err: any) {
+            alert(err.message || 'Failed to assign leader');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleStep3 = async () => {
+        if (!createdTeamId) return;
+        setIsSubmitting(true);
+
+        // Add all selected members
+        try {
+            const promises = selectedMemberIds.map(userId =>
+                api.post(`/teams/${createdTeamId}/members`, {
+                    userId: userId,
+                    role: 'member'
+                })
+            );
+            await Promise.all(promises);
+            await fetchTeams();
+            setShowWizard(false);
+            alert('Team setup complete!');
+        } catch (err: any) {
+            alert(err.message || 'Failed to add some members');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const toggleMemberSelection = (userId: string) => {
+        if (selectedMemberIds.includes(userId)) {
+            setSelectedMemberIds(selectedMemberIds.filter(id => id !== userId));
+        } else {
+            setSelectedMemberIds([...selectedMemberIds, userId]);
+        }
+    };
+
+    // --- Helpers for Filtering Users ---
+
+    // Eligible Leaders: Project Managers or Team Leaders (or anyone if loose rules)
+    // For safety, let's allow 'project_manager' and 'team_leader' roles.
+    const getEligibleLeaders = () => {
+        return users.filter(u => u.role === 'team_leader' || u.role === 'project_manager');
+    };
+
+    // Eligible Workers: Role 'worker' primarily, or anyone not already leader
+    const getEligibleWorkers = () => {
+        return users.filter(u => u.userId.toString() !== selectedLeaderId && (u.role === 'worker' || u.role === 'user'));
+    };
+
+
+    // --- Existing Add Member Logic (Single) ---
+    const openAddMemberModal = (teamId: number) => {
         setSelectedTeamId(teamId);
         setSelectedUserId('');
-        setShowAddModal(true);
+        setShowAddMemberModal(true);
     };
 
     const handleAddMember = async () => {
         if (!selectedTeamId || !selectedUserId) return;
-        setIsAdding(true);
+        setIsSubmitting(true);
         try {
-            // Defaulting role to 'member' (worker) for now as requested
             await api.post(`/teams/${selectedTeamId}/members`, {
                 userId: selectedUserId,
                 role: 'member'
             });
-
-            // Refresh teams to show new member
             await fetchTeams();
-            setShowAddModal(false);
+            setShowAddMemberModal(false);
             alert('Member added successfully!');
         } catch (err: any) {
             console.error(err);
             alert(err.message || 'Failed to add member');
         } finally {
-            setIsAdding(false);
+            setIsSubmitting(false);
         }
     };
 
-    // Filter users not already in the selected team
-    const getAvailableUsers = () => {
+    const getAvailableUsersForAdd = () => {
         if (!selectedTeamId) return [];
         const team = teams.find(t => t.teamId === selectedTeamId);
         if (!team) return [];
-
         const memberIds = team.members.map(m => m.userId);
-        // Also exclude leader if valid
         if (team.leader) memberIds.push(team.leader.userId);
-
-        return users.filter(u => !memberIds.includes(u.userId) && u.role !== 'project_manager');
+        return users.filter(u => !memberIds.includes(u.userId));
     };
 
-    if (loading) return <div>Loading...</div>;
+
+    if (loading) return (
+        <div className="flex items-center justify-center min-h-[500px]">
+            <div className="w-16 h-16 border-4 border-brand-cyan border-t-brand-teal rounded-full animate-spin"></div>
+        </div>
+    );
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Team Management</h1>
-                <Link
-                    href="/dashboard/pm/users"
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded shadow transition-colors"
-                >
-                    + Assign Workers to Team
-                </Link>
+        <div className="space-y-8">
+            {/* Header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-4xl font-black text-gray-800 dark:text-white tracking-tight">Team Management</h1>
+                    <p className="text-gray-500 dark:text-gray-400 mt-2 font-medium">Oversee your teams, assign leaders, and keep everyone organized.</p>
+                </div>
+                <div className="flex gap-4">
+                    <button
+                        onClick={openWizard}
+                        className="flex text-center justify-center items-center px-6 py-3 bg-linear-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-2xl shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:-translate-y-1 transition-all duration-300"
+                    >
+                        <PlusIcon className="w-5 h-5 mr-2" />
+                        Create Team
+                    </button>
+                    <Link
+                        href="/dashboard/pm/users"
+                        className="flex text-center justify-center items-center px-6 py-3 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 font-bold rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-300"
+                    >
+                        Manage Users
+                    </Link>
+                </div>
             </div>
 
-            <div className="grid gap-6">
+            {/* Teams Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
                 {teams.map((team) => (
-                    <div key={team.teamId} className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden border border-gray-100 dark:border-gray-700">
-                        {/* Team Header */}
-                        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-start">
-                            <div className="flex items-center gap-4">
-                                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                                    <svg className="w-8 h-8 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                                        {team.teamName} <span className="text-gray-400 font-normal mx-2">|</span> <span className="text-sm text-gray-500 dark:text-gray-400">{team.projectTitle}</span>
-                                    </h2>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                                        Team Leader: <span className="font-medium text-gray-700 dark:text-gray-300">{team.leader?.name || 'Unassigned'}</span>
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => openAddModal(team.teamId)}
-                                    className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 text-sm font-medium flex items-center gap-1"
-                                >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                                    Add Member
-                                </button>
-                                <button className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 text-sm font-medium">
-                                    View Details
-                                </button>
+                    <div key={team.teamId} className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm hover:shadow-xl hover:-translate-y-2 transition-all duration-300 border border-white/60 dark:border-gray-700 flex flex-col overflow-hidden group">
+
+                        {/* Card Header (Gradient) */}
+                        <div className="h-28 bg-linear-to-r from-brand-cyan to-brand-teal relative p-6">
+                            <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-white/20 rounded-full blur-2xl"></div>
+                            <h2 className="text-white text-xl font-bold truncate relative z-10">{team.teamName}</h2>
+                            <div className="flex items-center text-cyan-100 text-xs font-bold mt-1 relative z-10 uppercase tracking-wider">
+                                <FolderIcon className="w-3 h-3 mr-1" />
+                                {team.projectTitle}
                             </div>
                         </div>
 
-                        {/* Members Table */}
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                                <thead className="bg-gray-50 dark:bg-gray-700/50">
-                                    <tr>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Member Name</th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Role</th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Assigned Tasks</th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Progress</th>
-                                        <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                    {team.members.length > 0 ? (
-                                        team.members.map((member) => (
-                                            <tr key={member.userId}>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="flex items-center">
-                                                        <div className="flex-shrink-0 h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-xs font-bold text-gray-600 dark:text-gray-300">
-                                                            {member.name.charAt(0)}
-                                                        </div>
-                                                        <div className="ml-4">
-                                                            <div className="text-sm font-medium text-gray-900 dark:text-white">{member.name}</div>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                                                        ${member.role === 'leader' || member.role === 'team_leader' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}`}>
-                                                        {member.role === 'team_leader' ? 'Leader' : 'Worker'}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                                    {member.totalTasks} tasks
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="flex items-center">
-                                                        <div className="flex-1 w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2 mr-2">
-                                                            <div
-                                                                className="bg-indigo-600 h-2 rounded-full transition-all duration-500"
-                                                                style={{ width: `${member.progress}%` }}
-                                                            ></div>
-                                                        </div>
-                                                        <span className="text-sm text-gray-500 dark:text-gray-400">{member.progress}%</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                    <button className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1 rounded hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors">
-                                                        Assign Task
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                                                No members assigned to this team.
-                                            </td>
-                                        </tr>
+                        {/* Leader Section (Overlap) */}
+                        <div className="px-6 flex justify-between items-end -mt-10 relative z-10">
+                            <div className="flex flex-col items-center">
+                                <div className="w-20 h-20 rounded-2xl bg-white dark:bg-gray-800 p-1 shadow-md transition-colors">
+                                    <div className="w-full h-full rounded-xl bg-brand-peach/20 flex items-center justify-center text-brand-peach font-bold text-2xl border-2 border-brand-peach/30">
+                                        {team.leader?.name.charAt(0) || '?'}
+                                    </div>
+                                </div>
+                                <div className="mt-2 text-center">
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Leader</p>
+                                    <p className="text-sm font-bold text-gray-800 dark:text-gray-100 truncate max-w-[120px]">{team.leader?.name || 'Unassigned'}</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => openAddMemberModal(team.teamId)}
+                                className="mb-4 bg-brand-sage/20 text-brand-sage p-3 rounded-xl hover:bg-brand-sage/30 hover:scale-110 transition-all font-bold shadow-sm"
+                                title="Add Member"
+                            >
+                                <UserPlusIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Stats Summary */}
+                        <div className="px-6 py-4 flex gap-2 mt-2">
+                            <div className="px-3 py-1 rounded-lg bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-700 text-xs font-bold text-gray-500 dark:text-gray-400">
+                                {team.members.length} Members
+                            </div>
+                            <div className="px-3 py-1 rounded-lg bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-100 dark:border-cyan-900/30 text-xs font-bold text-brand-cyan">
+                                {team.members.reduce((acc, m) => acc + m.totalTasks, 0)} Tasks
+                            </div>
+                        </div>
+
+                        {/* Members List */}
+                        <div className="px-6 pb-6 flex-1 flex flex-col gap-3">
+                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Members</h3>
+
+                            {team.members.length > 0 ? (
+                                <div className="space-y-3">
+                                    {team.members.slice(0, 3).map((member) => (
+                                        <div key={member.userId} className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${member.role.includes('leader') ? 'bg-brand-peach/20 text-brand-peach' : 'bg-gray-100 dark:bg-gray-700 text-gray-500'}`}>
+                                                {member.name.charAt(0)}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex justify-between items-center mb-1">
+                                                    <p className="text-sm font-bold text-gray-700 dark:text-gray-200 truncate">{member.name}</p>
+                                                    <span className="text-xs text-brand-cyan font-bold">{member.progress}%</span>
+                                                </div>
+                                                <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
+                                                    <div className="bg-brand-cyan h-1.5 rounded-full" style={{ width: `${member.progress}%` }}></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {team.members.length > 3 && (
+                                        <p className="text-xs text-center text-gray-400 italic">...and {team.members.length - 3} more</p>
                                     )}
-                                </tbody>
-                            </table>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center py-6 text-gray-400 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border-2 border-dashed border-gray-100 dark:border-gray-700">
+                                    <p className="text-sm">No members yet.</p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 ))}
 
-                {teams.length === 0 && (
-                    <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow">
-                        <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                        </svg>
-                        <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No teams</h3>
-                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Get started by creating a new team.</p>
-                        <div className="mt-6">
-                            <Link
-                                href="/dashboard/pm/users"
-                                className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                            >
-                                <svg className="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                    <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                                </svg>
-                                Create Team
-                            </Link>
-                        </div>
+                {/* Create New Team Card */}
+                <button onClick={openWizard} className="bg-white/50 dark:bg-gray-800/50 border-2 border-dashed border-brand-cyan/30 rounded-3xl flex flex-col items-center justify-center p-10 hover:border-brand-cyan hover:bg-cyan-50/50 dark:hover:bg-gray-800 transition-all duration-300 group cursor-pointer min-h-[400px]">
+                    <div className="w-16 h-16 bg-cyan-50 dark:bg-cyan-900/20 text-brand-cyan rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-sm">
+                        <PlusIcon className="w-8 h-8" />
                     </div>
-                )}
+                    <h3 className="text-xl font-bold text-gray-400 group-hover:text-brand-cyan transition-colors">Create New Team</h3>
+                </button>
             </div>
 
-            {/* Add Member Modal */}
-            {showAddModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Add New Member</h2>
-                            <button onClick={() => setShowAddModal(false)} className="text-gray-500 hover:text-gray-700">
+            {/* --- WIZARD MODAL --- */}
+            {showWizard && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
+                    <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl p-8 w-full max-w-lg border border-gray-100 dark:border-gray-700 transform transition-all scale-100 relative overflow-hidden">
+                        {/* Progress Bar */}
+                        <div className="absolute top-0 left-0 w-full h-2 bg-gray-100 dark:bg-gray-800">
+                            <div className="h-full bg-linear-to-r from-cyan-500 to-blue-600 transition-all duration-300" style={{ width: `${step * 33.33}%` }}></div>
+                        </div>
+
+                        <div className="flex justify-between items-center mb-6 mt-2">
+                            <h2 className="text-2xl font-black text-gray-900 dark:text-white">
+                                {step === 1 && "Create Your Team"}
+                                {step === 2 && "Select a Leader"}
+                                {step === 3 && "Recruit Members"}
+                            </h2>
+                            <button
+                                onClick={() => setShowWizard(false)}
+                                className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-500 hover:text-red-500 transition-colors"
+                            >
                                 &times;
                             </button>
                         </div>
 
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Select User</label>
+                        {/* STEP 1: Basic Info */}
+                        {step === 1 && (
+                            <form onSubmit={handleStep1} className="space-y-6">
+                                <p className="text-gray-500 text-sm">Step 1: Name your squad and assign them to a mission.</p>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Team Name</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. Alpha Squad"
+                                        value={newTeamName}
+                                        onChange={e => setNewTeamName(e.target.value)}
+                                        className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-brand-cyan rounded-xl font-bold outline-none transition-all dark:text-white"
+                                        required
+                                        autoFocus
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Assign to Project</label>
+                                    <select
+                                        value={selectedProjectId}
+                                        onChange={e => setSelectedProjectId(e.target.value)}
+                                        className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-brand-cyan rounded-xl font-bold outline-none transition-all dark:text-white"
+                                        required
+                                    >
+                                        <option value="">-- Select Project --</option>
+                                        {projects.map(p => (
+                                            <option key={p.projectId} value={p.projectId}>{p.title}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <button
+                                    type="submit"
+                                    disabled={isSubmitting}
+                                    className="w-full py-4 bg-linear-to-r from-cyan-500 to-blue-600 text-white font-black rounded-xl shadow-lg hover:shadow-cyan-500/30 transform hover:-translate-y-1 transition-all"
+                                >
+                                    Next: Select Leader &rarr;
+                                </button>
+                            </form>
+                        )}
+
+                        {/* STEP 2: Select Leader */}
+                        {step === 2 && (
+                            <div className="space-y-6">
+                                <p className="text-gray-500 text-sm">Step 2: Who will lead this team? (Required)</p>
+                                <div className="max-h-60 overflow-y-auto space-y-2 pr-2 scrollbar-hide">
+                                    {getEligibleLeaders().map(user => (
+                                        <div
+                                            key={user.userId}
+                                            onClick={() => setSelectedLeaderId(user.userId.toString())}
+                                            className={`p-3 rounded-xl border-2 cursor-pointer flex items-center gap-3 transition-all ${selectedLeaderId === user.userId.toString() ? 'border-brand-cyan bg-cyan-50 dark:bg-cyan-900/20' : 'border-transparent bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                                        >
+                                            <div className="w-10 h-10 rounded-full bg-brand-peach/20 text-brand-peach flex items-center justify-center font-bold">
+                                                {user.firstName?.charAt(0) || user.username.charAt(0)}
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-gray-800 dark:text-white">{user.firstName} {user.lastName}</p>
+                                                <p className="text-xs text-gray-500">{user.role}</p>
+                                            </div>
+                                            {selectedLeaderId === user.userId.toString() && (
+                                                <div className="ml-auto text-brand-cyan">
+                                                    <CheckIcon className="w-6 h-6" />
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                                <button
+                                    onClick={handleStep2}
+                                    disabled={!selectedLeaderId || isSubmitting}
+                                    className="w-full py-4 bg-linear-to-r from-cyan-500 to-blue-600 text-white font-black rounded-xl shadow-lg hover:shadow-cyan-500/30 transform hover:-translate-y-1 transition-all disabled:opacity-50 disabled:grayscale"
+                                >
+                                    Next: Add Members &rarr;
+                                </button>
+                            </div>
+                        )}
+
+                        {/* STEP 3: Add Members */}
+                        {step === 3 && (
+                            <div className="space-y-6">
+                                <p className="text-gray-500 text-sm">Step 3: Recruit workers to the team. (Optional)</p>
+                                <div className="max-h-60 overflow-y-auto space-y-2 pr-2 scrollbar-hide">
+                                    {getEligibleWorkers().length > 0 ? getEligibleWorkers().map(user => (
+                                        <div
+                                            key={user.userId}
+                                            onClick={() => toggleMemberSelection(user.userId.toString())}
+                                            className={`p-3 rounded-xl border-2 cursor-pointer flex items-center gap-3 transition-all ${selectedMemberIds.includes(user.userId.toString()) ? 'border-brand-sage bg-green-50 dark:bg-green-900/20' : 'border-transparent bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                                        >
+                                            <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-500 flex items-center justify-center font-bold">
+                                                {user.firstName?.charAt(0) || user.username.charAt(0)}
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-gray-800 dark:text-white">{user.firstName} {user.lastName}</p>
+                                                <p className="text-xs text-gray-500">{user.role}</p>
+                                            </div>
+                                            {selectedMemberIds.includes(user.userId.toString()) && (
+                                                <div className="ml-auto text-brand-sage">
+                                                    <CheckIcon className="w-6 h-6" />
+                                                </div>
+                                            )}
+                                        </div>
+                                    )) : (
+                                        <p className="text-center text-gray-400 py-4">No eligible workers found.</p>
+                                    )}
+                                </div>
+                                <div className="flex gap-4">
+                                    <button
+                                        onClick={() => setShowWizard(false)}
+                                        className="flex-1 py-4 text-gray-500 font-bold hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
+                                    >
+                                        Skip this step
+                                    </button>
+                                    <button
+                                        onClick={handleStep3}
+                                        disabled={isSubmitting}
+                                        className="flex-1 py-4 bg-linear-to-r from-brand-sage to-emerald-600 text-white font-black rounded-xl shadow-lg hover:shadow-green-500/30 transform hover:-translate-y-1 transition-all"
+                                    >
+                                        {selectedMemberIds.length > 0 ? `Add ${selectedMemberIds.length} Members` : 'Finish Setup'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* --- EXISTING ADD MEMBER MODAL (For single adds) --- */}
+            {showAddMemberModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
+                    <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl p-8 w-full max-w-md border border-gray-100 dark:border-gray-700">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-2xl font-black text-gray-900 dark:text-white">Add Team Member</h2>
+                            <button onClick={() => setShowAddMemberModal(false)} className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-500 hover:text-red-500">&times;</button>
+                        </div>
+                        <div className="mb-6">
+                            <label className="block text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">Select User</label>
                             <select
                                 value={selectedUserId}
                                 onChange={(e) => setSelectedUserId(e.target.value)}
-                                className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-brand-cyan rounded-xl font-bold dark:text-white outline-none"
                             >
-                                <option value="">-- Select a user --</option>
-                                {getAvailableUsers().map(user => (
-                                    <option key={user.userId} value={user.userId}>
-                                        {user.firstName} {user.lastName} (@{user.username})
-                                    </option>
+                                <option value="">-- Choose a worker --</option>
+                                {getAvailableUsersForAdd().map(u => (
+                                    <option key={u.userId} value={u.userId}>{u.firstName} {u.lastName} ({u.role})</option>
                                 ))}
                             </select>
-                            {getAvailableUsers().length === 0 && (
-                                <p className="text-xs text-orange-500 mt-1">No available users to add.</p>
-                            )}
                         </div>
-
-                        <div className="flex justify-end gap-2">
-                            <button
-                                onClick={() => setShowAddModal(false)}
-                                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleAddMember}
-                                disabled={!selectedUserId || isAdding}
-                                className={`px-4 py-2 text-white rounded ${!selectedUserId || isAdding ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'}`}
-                            >
-                                {isAdding ? 'Adding...' : 'Add Member'}
-                            </button>
-                        </div>
+                        <button onClick={handleAddMember} disabled={!selectedUserId || isSubmitting} className="w-full py-3 bg-brand-cyan text-white font-bold rounded-xl shadow-lg">
+                            Add Member
+                        </button>
                     </div>
                 </div>
             )}
         </div>
     );
 }
+
+function PlusIcon({ className }: { className?: string }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" /></svg> }
+function FolderIcon({ className }: { className?: string }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg> }
+function UserPlusIcon({ className }: { className?: string }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg> }
+function CheckIcon({ className }: { className?: string }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg> }

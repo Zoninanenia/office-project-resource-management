@@ -6,126 +6,114 @@ import { api } from '@/lib/api';
 
 export default function NewProjectPage() {
     const router = useRouter();
-    const [formData, setFormData] = useState({
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [project, setProject] = useState({
         title: '',
         description: '',
         startDate: '',
         endDate: '',
         budget: '',
+        status: 'planning'
     });
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setLoading(true);
-        setError('');
+        setIsSubmitting(true);
 
         try {
-            await api.post('/projects', formData);
+            await api.post('/projects', {
+                ...project,
+                budget: parseFloat(project.budget) || 0
+            });
             router.push('/dashboard/projects');
         } catch (err: any) {
-            setError(err.message || 'Failed to create project');
+            alert(err.message || 'Failed to create project');
         } finally {
-            setLoading(false);
+            setIsSubmitting(false);
         }
     };
 
     return (
-        <div className="max-w-2xl mx-auto">
-            <h1 className="text-3xl font-bold text-gray-800 dark:text-white mb-6">Create New Project</h1>
+        <div className="max-w-2xl mx-auto py-8">
+            <h1 className="text-4xl font-black mb-2 tracking-tight text-transparent bg-clip-text bg-linear-to-r from-cyan-500 to-blue-600">Create New Project</h1>
+            <p className="text-gray-500 dark:text-gray-400 mb-8 font-medium">Kick off your next big adventure.</p>
 
-            {error && (
-                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                    {error}
-                </div>
-            )}
+            <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-700 p-8 space-y-6 relative overflow-hidden">
+                {/* Decorative Top Bar */}
+                <div className="absolute top-0 left-0 right-0 h-2 bg-linear-to-r from-cyan-500 to-blue-600"></div>
 
-            <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 shadow-md rounded px-8 pt-6 pb-8 mb-4">
-                <div className="mb-4">
-                    <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2" htmlFor="title">
-                        Project Title
-                    </label>
+                <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Project Title</label>
                     <input
-                        className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                        id="title"
                         type="text"
-                        placeholder="Enter project title"
-                        value={formData.title}
-                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                        value={project.title}
+                        onChange={e => setProject({ ...project, title: e.target.value })}
+                        className="w-full p-4 bg-gray-50 dark:bg-gray-900 border-2 border-transparent focus:border-cyan-500 rounded-xl font-bold text-lg outline-none transition-all dark:text-white"
+                        placeholder="e.g. Website Redesign v2"
                         required
                     />
                 </div>
 
-                <div className="mb-4">
-                    <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2" htmlFor="description">
-                        Description
-                    </label>
+                <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Description</label>
                     <textarea
-                        className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                        id="description"
-                        rows={4}
-                        placeholder="Project description"
-                        value={formData.description}
-                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        value={project.description}
+                        onChange={e => setProject({ ...project, description: e.target.value })}
+                        className="w-full p-4 bg-gray-50 dark:bg-gray-900 border-2 border-transparent focus:border-cyan-500 rounded-xl font-medium outline-none transition-all dark:text-white min-h-[120px]"
+                        placeholder="What is this project about?"
+                        required
                     />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                        <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2" htmlFor="startDate">
-                            Start Date
-                        </label>
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Start Date</label>
                         <input
-                            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                            id="startDate"
                             type="date"
-                            value={formData.startDate}
-                            onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                            value={project.startDate}
+                            onChange={e => setProject({ ...project, startDate: e.target.value })}
+                            className="w-full p-3 bg-gray-50 dark:bg-gray-900 border-2 border-transparent focus:border-cyan-500 rounded-xl font-bold outline-none transition-all dark:text-white"
+                            required
                         />
                     </div>
                     <div>
-                        <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2" htmlFor="endDate">
-                            End Date
-                        </label>
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">End Date (Optional)</label>
                         <input
-                            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                            id="endDate"
                             type="date"
-                            value={formData.endDate}
-                            onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                            value={project.endDate}
+                            onChange={e => setProject({ ...project, endDate: e.target.value })}
+                            className="w-full p-3 bg-gray-50 dark:bg-gray-900 border-2 border-transparent focus:border-cyan-500 rounded-xl font-bold outline-none transition-all dark:text-white"
                         />
                     </div>
                 </div>
 
-                <div className="mb-6">
-                    <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2" htmlFor="budget">
-                        Budget ($)
-                    </label>
+                <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Budget ($)</label>
                     <input
-                        className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                        id="budget"
                         type="number"
+                        value={project.budget}
+                        onChange={e => setProject({ ...project, budget: e.target.value })}
+                        className="w-full p-3 bg-gray-50 dark:bg-gray-900 border-2 border-transparent focus:border-cyan-500 rounded-xl font-bold outline-none transition-all dark:text-white"
                         placeholder="0.00"
-                        value={formData.budget}
-                        onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
+                        min="0"
+                        step="0.01"
                     />
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex gap-4 pt-4">
                     <button
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
-                        type="submit"
-                        disabled={loading}
-                    >
-                        {loading ? 'Creating...' : 'Create Project'}
-                    </button>
-                    <button
-                        className="inline-block align-baseline font-bold text-sm text-indigo-600 hover:text-indigo-800"
                         type="button"
                         onClick={() => router.back()}
+                        className="flex-1 py-4 text-gray-500 font-bold hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors"
                     >
                         Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="flex-1 py-4 bg-linear-to-r from-cyan-500 to-blue-600 hover:shadow-cyan-500/30 text-white font-black rounded-xl shadow-lg transform hover:-translate-y-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isSubmitting ? 'Creating Project...' : 'Launch Project'}
                     </button>
                 </div>
             </form>

@@ -1,8 +1,18 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Custom Brand Colors */
+  --brand-peach: #FCA47C;
+  --brand-cyan: #007AFF;
+  /* Track Progress Blue */
+  --brand-teal: #097C87;
+  --brand-yellow: #F9D779;
+  --brand-sage: #A1CCA6;
 }
 
 @theme inline {
@@ -10,13 +20,56 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Add Custom Colors to Theme */
+  --color-brand-peach: var(--brand-peach);
+  --color-brand-cyan: var(--brand-cyan);
+  --color-brand-teal: var(--brand-teal);
+  --color-brand-yellow: var(--brand-yellow);
+  --color-brand-sage: var(--brand-sage);
+
+  /* Custom Animations */
+  --animate-fade-in: fade-in 0.3s ease-in-out;
+  --animate-shimmer: shimmer 2s infinite;
+
+  @keyframes fade-in {
+    0% {
+      opacity: 0;
+    }
+
+    100% {
+      opacity: 1;
+    }
+  }
+
+  @keyframes shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+}
+
+/* Utilities */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* Default to dark if system preference, but we will toggle class */
+    /* --background: #0a0a0a; */
+    /* --foreground: #ededed; */
   }
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
 }
 
 body {
