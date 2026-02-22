@@ -121,3 +121,68 @@ exports.addTeamMember = async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 };
+
+exports.deleteTeam = async (req, res) => {
+    const { teamId } = req.params;
+    try {
+        const result = await db.query('DELETE FROM Teams WHERE teamId = $1 RETURNING *', [teamId]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Team not found' });
+        }
+        res.json({ message: 'Team deleted successfully' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+exports.updateTeam = async (req, res) => {
+    const { teamId } = req.params;
+    const { teamName, projectId, leaderId, memberIds } = req.body;
+
+    const client = await db.connect();
+
+    try {
+        await client.query('BEGIN');
+
+        // Update Teams table
+        const teamRes = await client.query(
+            'UPDATE Teams SET teamName = $1, projectId = $2 WHERE teamId = $3 RETURNING *',
+            [teamName, projectId, teamId]
+        );
+
+        if (teamRes.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ message: 'Team not found' });
+        }
+
+        // Wipe existing members
+        await client.query('DELETE FROM TeamMembers WHERE teamId = $1', [teamId]);
+
+        // Re-insert leader
+        if (leaderId) {
+            await client.query(
+                'INSERT INTO TeamMembers (teamId, userId, role) VALUES ($1, $2, $3)',
+                [teamId, leaderId, 'leader']
+            );
+        }
+
+        // Re-insert members
+        if (memberIds && Array.isArray(memberIds)) {
+            for (const mId of memberIds) {
+                await client.query(
+                    'INSERT INTO TeamMembers (teamId, userId, role) VALUES ($1, $2, $3)',
+                    [teamId, mId, 'member']
+                );
+            }
+        }
+
+        await client.query('COMMIT');
+        res.json({ message: 'Team updated successfully' });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        res.status(500).json({ error: err.message });
+    } finally {
+        client.release();
+    }
+};
+

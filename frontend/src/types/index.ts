@@ -1,6 +1,6 @@
 export type TeamRole = 'leader' | 'member' | 'observer';
 export type TaskStatus = 'todo' | 'in_progress' | 'review' | 'done';
-export type UserRole = 'project_manager' | 'team_leader' | 'worker' | 'user';
+export type UserRole = 'admin' | 'project_manager' | 'team_leader' | 'worker' | 'user';
 
 export interface User {
     userId: number;
@@ -20,7 +20,7 @@ export interface Project {
     startDate: string;
     endDate: string;
     budget?: number;
-    status: 'planning' | 'active' | 'completed' | 'on_hold';
+    status: 'active' | 'completed' | 'on_hold';
     createdAt: string;
     ownerId?: number;
     teamName?: string;
@@ -31,6 +31,15 @@ export interface Team {
     teamName: string;
     projectId: number;
     createdAt: string;
+    members: {
+        userId: number;
+        name: string;
+        role: TeamRole;
+    }[];
+    leader?: {
+        userId: number;
+        name: string;
+    };
 }
 
 export interface Task {
@@ -42,6 +51,7 @@ export interface Task {
     dueDate?: string;
     creatorId: number;
     projectId: number;
+    dependencies?: number[];
     assignees?: {
         workerId: number;
         workerName: string;

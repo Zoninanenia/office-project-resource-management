@@ -15,8 +15,14 @@ export default function ProjectDetailPage() {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
 
     useEffect(() => {
+        const userStr = localStorage.getItem('user');
+        if (userStr) {
+            setCurrentUserRole(JSON.parse(userStr).role);
+        }
+
         if (!projectId) return;
 
         const fetchData = async () => {
@@ -63,6 +69,18 @@ export default function ProjectDetailPage() {
         </div>
     );
 
+    const handleMarkAsDone = async () => {
+        if (!project || !projectId) return;
+
+        try {
+            await api.put(`/projects/${projectId}/status`, { status: 'completed' });
+            setProject({ ...project, status: 'completed' });
+            // Show some success feedback? The UI update should be enough for now.
+        } catch (err: any) {
+            alert(err.message || 'Failed to mark project as completed');
+        }
+    };
+
     // Calculate Progress based on tasks
     const totalTasks = tasks.length;
     const completedTasks = tasks.filter(t => t.status === 'done').length;
@@ -86,6 +104,21 @@ export default function ProjectDetailPage() {
                         <span className="px-4 py-1.5 bg-white/20 backdrop-blur-md rounded-full text-xs font-black uppercase tracking-widest border border-white/20">
                             {status.replace('_', ' ')}
                         </span>
+
+                        {currentUserRole === 'project_manager' && status !== 'completed' && progress === 100 && totalTasks > 0 && (
+                            <button
+                                onClick={handleMarkAsDone}
+                                className="ml-auto px-6 py-2 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/30 transition-all hover:-translate-y-1"
+                            >
+                                Mark Project as Done
+                            </button>
+                        )}
+                        {currentUserRole === 'project_manager' && status !== 'completed' && (progress < 100 || totalTasks === 0) && (
+                            <div className="ml-auto px-6 py-2 bg-gray-500/50 text-white/50 font-bold rounded-xl border border-dashed border-white/20 cursor-not-allowed text-sm flex items-center gap-2" title="All tasks must be completed first">
+                                Mark Project as Done
+                                <LockIcon className="w-4 h-4" />
+                            </div>
+                        )}
                     </div>
 
                     <h1 className="text-4xl md:text-5xl font-black mb-4 tracking-tight drop-shadow-md">{project.title}</h1>
@@ -271,3 +304,4 @@ function WalletIcon({ className }: { className?: string }) { return <svg classNa
 function InfoIcon({ className }: { className?: string }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>; }
 function ListIcon({ className }: { className?: string }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>; }
 function UsersIcon({ className }: { className?: string }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>; }
+function LockIcon({ className }: { className?: string }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>; }

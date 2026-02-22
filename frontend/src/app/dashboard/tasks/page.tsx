@@ -16,8 +16,10 @@ export default function GlobalTasksPage() {
     const [search, setSearch] = useState('');
     const [userRole, setUserRole] = useState<string | null>(null);
 
-    // Create Task Modal State
+    // Create/Edit Task Modal State
     const [showCreateModal, setShowCreateModal] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
     const [projects, setProjects] = useState<{ projectId: number, title: string }[]>([]);
     const [potentialAssignees, setPotentialAssignees] = useState<User[]>([]);
     const [newTask, setNewTask] = useState({
@@ -27,6 +29,7 @@ export default function GlobalTasksPage() {
         status: 'todo',
         dueDate: '',
         assignedTo: [] as string[],
+        dependencies: [] as number[],
     });
     const [isAssigneeDropdownOpen, setIsAssigneeDropdownOpen] = useState(false);
 
@@ -51,8 +54,7 @@ export default function GlobalTasksPage() {
     }, []);
 
     // Fetch resources for modal
-    const handleOpenCreateModal = async () => {
-        setShowCreateModal(true);
+    const handleOpenCreateModal = async (taskToEdit?: ExtendedTask) => {
         try {
             if (projects.length === 0) {
                 const projectData = await api.get<{ projectId: number, title: string }[]>('/projects');
@@ -62,8 +64,38 @@ export default function GlobalTasksPage() {
                 const userData = await api.get<User[]>('/users?role=worker');
                 setPotentialAssignees(userData);
             }
+
+            if (taskToEdit) {
+                setIsEditing(true);
+                setEditingTaskId(taskToEdit.taskId);
+                const isoDate = taskToEdit.dueDate ? new Date(taskToEdit.dueDate).toISOString().split('T')[0] : '';
+                setNewTask({
+                    projectId: taskToEdit.projectId.toString(),
+                    taskName: taskToEdit.taskName,
+                    description: taskToEdit.description || '',
+                    status: taskToEdit.status,
+                    dueDate: isoDate,
+                    assignedTo: taskToEdit.assignees ? taskToEdit.assignees.map((a: any) => a.workerId.toString()) : [],
+                    dependencies: taskToEdit.dependencies || [],
+                });
+            } else {
+                setIsEditing(false);
+                setEditingTaskId(null);
+                setNewTask({
+                    projectId: '',
+                    taskName: '',
+                    description: '',
+                    status: 'todo',
+                    dueDate: '',
+                    assignedTo: [],
+                    dependencies: [],
+                });
+            }
+
         } catch (err) {
             console.error('Failed to fetch resources', err);
+        } finally {
+            setShowCreateModal(true);
         }
     };
 
@@ -75,10 +107,17 @@ export default function GlobalTasksPage() {
         }
 
         try {
-            await api.post(`/tasks/project/${newTask.projectId}`, {
-                ...newTask,
-                projectId: undefined // API endpoint handles projectId from URL, but we need it locally for selection
-            });
+            if (isEditing && editingTaskId) {
+                await api.put(`/tasks/${editingTaskId}`, {
+                    ...newTask,
+                    projectId: undefined // not updated here, but prevent error
+                });
+            } else {
+                await api.post(`/tasks/project/${newTask.projectId}`, {
+                    ...newTask,
+                    projectId: undefined
+                });
+            }
             setShowCreateModal(false);
 
             // Refresh tasks
@@ -93,9 +132,23 @@ export default function GlobalTasksPage() {
                 status: 'todo',
                 dueDate: '',
                 assignedTo: [],
+                dependencies: [],
             });
         } catch (err: any) {
-            alert(err.message || 'Failed to create task');
+            alert(err.message || 'Failed to process task');
+        }
+    };
+
+    const handleDeleteTask = async (taskId: number, taskName: string) => {
+        if (confirm(`Are you sure you want to delete task "${taskName}"? This action cannot be undone.`)) {
+            try {
+                await api.delete(`/tasks/${taskId}`);
+                // Refresh list
+                const data = await api.get<ExtendedTask[]>('/tasks');
+                setTasks(data);
+            } catch (err: any) {
+                alert(err.message || 'Failed to delete task');
+            }
         }
     };
 
@@ -127,7 +180,19 @@ export default function GlobalTasksPage() {
 
             <div className="pl-3">
                 <div className="flex justify-between items-start mb-2">
-                    <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100 line-clamp-2 leading-tight">{task.taskName}</h3>
+                    <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100 line-clamp-2 leading-tight pr-12">{task.taskName}</h3>
+
+                    {/* Action Buttons for PMs/Leaders */}
+                    {(userRole === 'project_manager' || userRole === 'team_leader') && (
+                        <div className="absolute top-3 right-3 flex gap-1 z-10 transition-opacity">
+                            <button onClick={() => handleOpenCreateModal(task)} className="p-1.5 text-gray-400 hover:text-brand-cyan hover:bg-cyan-50 dark:hover:bg-gray-700 rounded-lg transition-colors" title="Edit Task">
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                            </button>
+                            <button onClick={() => handleDeleteTask(task.taskId, task.taskName)} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-gray-700 rounded-lg transition-colors" title="Delete Task">
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                        </div>
+                    )}
                 </div>
                 <p className="text-xs font-bold text-brand-teal dark:text-brand-cyan mb-3 uppercase tracking-wider">{task.projectName}</p>
 
@@ -160,6 +225,24 @@ export default function GlobalTasksPage() {
                         {new Date(task.dueDate).toLocaleDateString()}
                     </div>
                 )}
+
+                {/* Blocked Status */}
+                {(() => {
+                    if (task.status === 'done' || !task.dependencies || task.dependencies.length === 0) return null;
+                    const blockedBy = task.dependencies
+                        .map(depId => tasks.find(t => t.taskId === depId))
+                        .filter(t => t && t.status !== 'done');
+
+                    if (blockedBy.length > 0) {
+                        return (
+                            <div className="mt-2 bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400 text-[10px] font-bold px-2 py-1.5 rounded-lg border border-red-100 dark:border-red-900/30 flex items-center gap-1">
+                                <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                                <span className="truncate">Blocked by: {blockedBy.map(t => t?.taskName).join(', ')}</span>
+                            </div>
+                        );
+                    }
+                    return null;
+                })()}
             </div>
         </div>
     );
@@ -179,7 +262,7 @@ export default function GlobalTasksPage() {
                 </div>
                 {(userRole === 'project_manager' || userRole === 'team_leader') && (
                     <button
-                        onClick={handleOpenCreateModal}
+                        onClick={() => handleOpenCreateModal()}
                         className="px-6 py-2.5 bg-linear-to-r from-cyan-500 to-blue-600 hover:shadow-cyan-500/30 text-white font-bold rounded-xl shadow-lg transition-all flex items-center gap-2 whitespace-nowrap"
                     >
                         <span className="text-xl leading-none">+</span> New Task
@@ -250,7 +333,7 @@ export default function GlobalTasksPage() {
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
                     <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 w-full max-w-lg shadow-2xl scale-100 transition-all">
                         <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-2xl font-black text-gray-900 dark:text-white">Create New Task</h2>
+                            <h2 className="text-2xl font-black text-gray-900 dark:text-white">{isEditing ? 'Edit Task Info' : 'Create New Task'}</h2>
                             <button onClick={() => setShowCreateModal(false)} className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 hover:text-red-500 transition-colors">&times;</button>
                         </div>
 
@@ -262,6 +345,7 @@ export default function GlobalTasksPage() {
                                     onChange={e => setNewTask({ ...newTask, projectId: e.target.value })}
                                     className="w-full p-3 bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-brand-cyan rounded-xl font-bold outline-none transition-all dark:text-white"
                                     required
+                                    disabled={isEditing} // usually changing project mid-flight is tricky, disabling for simpler UX
                                 >
                                     <option value="">Select a project...</option>
                                     {projects.map(p => (
@@ -371,11 +455,47 @@ export default function GlobalTasksPage() {
                                 </div>
                             </div>
 
+                            {/* Dependencies Selector */}
+                            {newTask.projectId && (
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Must be finished after (Dependencies)</label>
+                                    <div className="max-h-40 overflow-y-auto border-2 border-transparent bg-gray-50 dark:bg-gray-700 rounded-xl p-2 focus-within:border-brand-cyan transition-all">
+                                        {(() => {
+                                            const projectTasks = tasks.filter(t => t.projectId.toString() === newTask.projectId);
+                                            if (projectTasks.length === 0) {
+                                                return <p className="text-xs text-gray-400 font-medium p-2">No existing tasks in this project.</p>;
+                                            }
+                                            return projectTasks.map(t => (
+                                                <div key={`dep-${t.taskId}`} className="flex items-center space-x-2 py-1.5 px-2 hover:bg-white dark:hover:bg-gray-600 rounded-lg transition-colors cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        id={`global-dep-${t.taskId}`}
+                                                        checked={newTask.dependencies.includes(t.taskId)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setNewTask(prev => ({ ...prev, dependencies: [...prev.dependencies, t.taskId] }));
+                                                            } else {
+                                                                setNewTask(prev => ({ ...prev, dependencies: prev.dependencies.filter(id => id !== t.taskId) }));
+                                                            }
+                                                        }}
+                                                        className="rounded border-gray-300 text-brand-cyan shadow-sm focus:border-brand-cyan focus:ring focus:ring-brand-cyan/20"
+                                                    />
+                                                    <label htmlFor={`global-dep-${t.taskId}`} className="text-sm font-bold text-gray-700 dark:text-gray-200 cursor-pointer select-none flex-1 truncate">
+                                                        {t.taskName} <span className="text-[10px] text-gray-400 font-medium ml-1">({t.status.replace('_', ' ')})</span>
+                                                    </label>
+                                                </div>
+                                            ));
+                                        })()}
+                                    </div>
+                                    <p className="text-[10px] text-gray-400 mt-1 font-medium">Select tasks that must be completed before this one can begin.</p>
+                                </div>
+                            )}
+
                             <button
                                 type="submit"
                                 className="w-full py-4 mt-2 bg-linear-to-r from-cyan-500 to-blue-600 hover:shadow-cyan-500/30 text-white font-black rounded-xl shadow-lg transform hover:-translate-y-1 transition-all"
                             >
-                                Create Task
+                                {isEditing ? 'Save Changes' : 'Create Task'}
                             </button>
                         </form>
                     </div>

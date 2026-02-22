@@ -56,6 +56,11 @@ exports.updateUserRole = async (req, res) => {
     const { id } = req.params;
     const { role } = req.body;
 
+    // Prevent changing own role
+    if (parseInt(id) === req.user.userId || id === req.user.userId) {
+        return res.status(403).json({ message: 'Cannot change your own role' });
+    }
+
     // Validate generic role if needed, though Postgres Enum handles it strict
     // user_role_enum: 'project_manager', 'team_leader', 'worker', 'user'
 

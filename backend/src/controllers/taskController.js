@@ -15,7 +15,13 @@ exports.getAllTasks = async (req, res) => {
                      json_build_object('workerId', w.userId, 'workerName', w.username)
                  ) FILTER (WHERE w.userId IS NOT NULL), 
                  '[]'
-             ) as "assignees"
+             ) as "assignees",
+             COALESCE(
+                 (SELECT json_agg(td.dependsOnTaskId) 
+                  FROM TaskDependencies td 
+                  WHERE td.taskId = t.taskId),
+                 '[]'
+             ) as "dependencies"
       FROM Tasks t
       LEFT JOIN Projects p ON t.projectId = p.projectId
       LEFT JOIN Users u ON t.creatorId = u.userId
@@ -54,7 +60,13 @@ exports.getTasksByProject = async (req, res) => {
                      json_build_object('workerId', w.userId, 'workerName', w.username)
                  ) FILTER (WHERE w.userId IS NOT NULL), 
                  '[]'
-             ) as "assignees"
+             ) as "assignees",
+             COALESCE(
+                 (SELECT json_agg(td.dependsOnTaskId) 
+                  FROM TaskDependencies td 
+                  WHERE td.taskId = t.taskId),
+                 '[]'
+             ) as "dependencies"
       FROM Tasks t
       LEFT JOIN Users u ON t.creatorId = u.userId
       LEFT JOIN TasksToWorkers ttw ON t.taskId = ttw.taskId
@@ -74,7 +86,7 @@ exports.getTasksByProject = async (req, res) => {
 // Create a new task (PM/Team Leader)
 exports.createTask = async (req, res) => {
     const { projectId } = req.params;
-    const { taskName, description, status, dueDate, assignedTo } = req.body;
+    const { taskName, description, status, dueDate, assignedTo, dependencies } = req.body;
     const creatorId = req.user.userId; // From auth middleware
 
     // Handle empty date string
@@ -103,6 +115,16 @@ exports.createTask = async (req, res) => {
             }
         }
 
+        // Add task dependencies
+        if (dependencies && Array.isArray(dependencies) && dependencies.length > 0) {
+            for (const depId of dependencies) {
+                await client.query(
+                    'INSERT INTO TaskDependencies (taskId, dependsOnTaskId) VALUES ($1, $2)',
+                    [taskId, depId]
+                );
+            }
+        }
+
         await client.query('COMMIT');
         res.status(201).json(newTask.rows[0]);
     } catch (err) {
@@ -120,6 +142,21 @@ exports.updateTaskStatus = async (req, res) => {
     const { status } = req.body;
 
     try {
+        // Enforce dependencies: cannot start or finish if dependencies are not done
+        if (['in_progress', 'review', 'done'].includes(status)) {
+            const depsCheck = await pool.query(`
+                SELECT t.taskId, t.taskName, t.status
+                FROM TaskDependencies td
+                JOIN Tasks t ON td.dependsOnTaskId = t.taskId
+                WHERE td.taskId = $1 AND t.status != 'done'
+            `, [taskId]);
+
+            if (depsCheck.rows.length > 0) {
+                const pendingTasks = depsCheck.rows.map(r => r.taskName).join(', ');
+                return res.status(400).json({ message: `Blocked by unfinished tasks: ${pendingTasks}` });
+            }
+        }
+
         const result = await pool.query(
             'UPDATE Tasks SET status = $1 WHERE taskId = $2 RETURNING taskId as "taskId", status',
             [status, taskId]
@@ -135,3 +172,79 @@ exports.updateTaskStatus = async (req, res) => {
         res.status(500).send('Server Error');
     }
 }
+
+// Delete Task (PM/Team Leader)
+exports.deleteTask = async (req, res) => {
+    const { taskId } = req.params;
+    try {
+        const result = await pool.query('DELETE FROM Tasks WHERE taskId = $1 RETURNING *', [taskId]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Task not found' });
+        }
+        res.json({ message: 'Task deleted successfully' });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// Update Task Details (PM/Team Leader)
+exports.updateTask = async (req, res) => {
+    const { taskId } = req.params;
+    const { taskName, description, dueDate, assignedTo, dependencies } = req.body;
+
+    const validDueDate = dueDate === '' ? null : dueDate;
+    const client = await pool.connect();
+
+    try {
+        await client.query('BEGIN');
+
+        // Update core task info
+        const result = await client.query(
+            'UPDATE Tasks SET taskName = $1, description = $2, dueDate = $3 WHERE taskId = $4 RETURNING *',
+            [taskName, description, validDueDate, taskId]
+        );
+
+        if (result.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ message: 'Task not found' });
+        }
+
+        // Handle Assignments update
+        if (assignedTo !== undefined) {
+            // Wipe old
+            await client.query('DELETE FROM TasksToWorkers WHERE taskId = $1', [taskId]);
+            // Insert new
+            if (Array.isArray(assignedTo)) {
+                for (const workerId of assignedTo) {
+                    await client.query('INSERT INTO TasksToWorkers (taskId, workerId) VALUES ($1, $2)', [taskId, workerId]);
+                }
+            }
+        }
+
+        // Handle Dependencies update
+        if (dependencies !== undefined) {
+            // Wipe old
+            await client.query('DELETE FROM TaskDependencies WHERE taskId = $1', [taskId]);
+            // Insert new
+            if (Array.isArray(dependencies)) {
+                for (const depId of dependencies) {
+                    // Prevent self dependency theoretically
+                    if (depId !== parseInt(taskId)) {
+                        await client.query('INSERT INTO TaskDependencies (taskId, dependsOnTaskId) VALUES ($1, $2)', [taskId, depId]);
+                    }
+                }
+            }
+        }
+
+        await client.query('COMMIT');
+        res.json({ message: 'Task updated successfully', task: result.rows[0] });
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Update Task Error:', err.message);
+        res.status(500).json({ message: err.message || 'Server Error' });
+    } finally {
+        client.release();
+    }
+};

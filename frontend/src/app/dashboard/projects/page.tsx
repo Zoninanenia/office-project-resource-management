@@ -77,7 +77,7 @@ export default function ProjectsPage() {
                         className="px-4 py-3 bg-white dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 rounded-xl font-bold text-gray-700 dark:text-gray-200 outline-none focus:border-cyan-400 cursor-pointer shadow-sm"
                     >
                         <option>All Status</option>
-                        <option value="planning">Planning</option>
+                        { /* <option value="planning">Planning</option>*/ }
                         <option value="active">Active</option>
                         <option value="completed">Completed</option>
                     </select>

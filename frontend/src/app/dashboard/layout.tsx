@@ -97,19 +97,23 @@ export default function DashboardLayout({
 
                 {/* Nav Items */}
                 <nav className="flex-1 flex flex-col gap-2 w-full px-3 overflow-y-auto scrollbar-hide">
-                    <TooltipNavItem href="/dashboard" icon={<DashboardIcon />} label="Home" active={isActive('/dashboard')} expanded={isSidebarExpanded} />
-                    <TooltipNavItem href="/dashboard/projects" icon={<FolderIcon />} label="Projects" active={isActive('/dashboard/projects')} expanded={isSidebarExpanded} />
-                    <TooltipNavItem href="/dashboard/tasks" icon={<ListIcon />} label="My Tasks" active={isActive('/dashboard/tasks')} expanded={isSidebarExpanded} />
-                    <TooltipNavItem href="/dashboard/teams" icon={<UsersIcon />} label="Teams" active={isActive('/dashboard/teams')} expanded={isSidebarExpanded} />
-                    <TooltipNavItem href="/dashboard/issues" icon={<BugIcon />} label="Issues" active={isActive('/dashboard/issues')} expanded={isSidebarExpanded} />
+                    {userRole !== 'admin' && (
+                        <>
+                            <TooltipNavItem href="/dashboard" icon={<DashboardIcon />} label="Home" active={isActive('/dashboard')} expanded={isSidebarExpanded} />
+                            <TooltipNavItem href="/dashboard/projects" icon={<FolderIcon />} label="Projects" active={isActive('/dashboard/projects')} expanded={isSidebarExpanded} />
+                            <TooltipNavItem href="/dashboard/tasks" icon={<ListIcon />} label="My Tasks" active={isActive('/dashboard/tasks')} expanded={isSidebarExpanded} />
+                            <TooltipNavItem href="/dashboard/teams" icon={<UsersIcon />} label="Teams" active={isActive('/dashboard/teams')} expanded={isSidebarExpanded} />
+                            <TooltipNavItem href="/dashboard/issues" icon={<BugIcon />} label="Issues" active={isActive('/dashboard/issues')} expanded={isSidebarExpanded} />
 
-                    <div className="my-2 border-t border-gray-800 w-full"></div>
+                            <div className="my-2 border-t border-gray-800 w-full"></div>
+                        </>
+                    )}
+
+                    {(userRole === 'admin') && (
+                        <TooltipNavItem href="/dashboard/admin/users" icon={<AdminIcon />} label="User Management" active={isActive('/dashboard/admin/users')} expanded={isSidebarExpanded} />
+                    )}
 
                     <TooltipNavItem href="/dashboard/settings" icon={<SettingsIcon />} label="Settings" active={isActive('/dashboard/settings')} expanded={isSidebarExpanded} />
-
-                    {(userRole === 'project_manager') && (
-                        <TooltipNavItem href="/dashboard/pm/users" icon={<AdminIcon />} label="Admin" active={isActive('/dashboard/pm/users')} expanded={isSidebarExpanded} />
-                    )}
                 </nav>
 
                 {/* Bottom Actions */}
@@ -142,7 +146,9 @@ export default function DashboardLayout({
                         {isSidebarExpanded && (
                             <div className="ml-3 truncate">
                                 <p className="text-sm font-bold text-white truncate">My Account</p>
-                                <p className="text-xs text-brand-cyan truncate capitalize">{userRole?.replace('_', ' ')}</p>
+                                <p className={`text-xs truncate capitalize ${userRole === 'admin' ? 'text-brand-peach' : 'text-brand-cyan'}`}>
+                                    {userRole?.replace('_', ' ')}
+                                </p>
                             </div>
                         )}
                     </div>

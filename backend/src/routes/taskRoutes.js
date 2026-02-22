@@ -15,4 +15,10 @@ router.post('/project/:projectId', verifyToken, checkRole(['project_manager', 't
 // Update Task Status - Any authenticated user (logic might need refinement for ownership)
 router.put('/:taskId/status', verifyToken, taskController.updateTaskStatus);
 
+// Edit Task Details - PM or Team Leader
+router.put('/:taskId', verifyToken, checkRole(['project_manager', 'team_leader']), taskController.updateTask);
+
+// Delete Task - PM or Team Leader
+router.delete('/:taskId', verifyToken, checkRole(['project_manager', 'team_leader']), taskController.deleteTask);
+
 module.exports = router;

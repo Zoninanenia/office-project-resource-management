@@ -54,18 +54,34 @@ async function setupDatabase() {
         await dbClient.query(sql);
         console.log('Schema initialized successfully.');
 
-        // Seed initial data (PM User)
+        // Seed initial data (Admin User)
         console.log('Seeding initial data...');
-        // Check if pm exists
-        const checkUser = await dbClient.query("SELECT * FROM Users WHERE username = 'pm'");
-        if (checkUser.rowCount === 0) {
+        // Check if admin exists
+        const checkAdmin = await dbClient.query("SELECT * FROM Users WHERE username = 'admin'");
+        if (checkAdmin.rowCount === 0) {
             const bcrypt = require('bcryptjs');
             const salt = await bcrypt.genSalt(10);
             const hashedPassword = await bcrypt.hash('password123', salt);
 
             await dbClient.query(`
                 INSERT INTO Users (username, passwordHash, email, firstName, lastName, role)
-                VALUES ('pm', $1, 'pm@example.com', 'System', 'Admin', 'project_manager')
+                VALUES ('admin', $1, 'admin@example.com', 'System', 'Admin', 'admin')
+            `, [hashedPassword]);
+            console.log('Default Admin User created: admin / password123');
+        } else {
+            console.log('Admin user already exists.');
+        }
+
+        // Check if pm exists
+        const checkPM = await dbClient.query("SELECT * FROM Users WHERE username = 'pm'");
+        if (checkPM.rowCount === 0) {
+            const bcrypt = require('bcryptjs');
+            const salt = await bcrypt.genSalt(10);
+            const hashedPassword = await bcrypt.hash('password123', salt);
+
+            await dbClient.query(`
+                INSERT INTO Users (username, passwordHash, email, firstName, lastName, role)
+                VALUES ('pm', $1, 'pm@example.com', 'Project', 'Manager', 'project_manager')
             `, [hashedPassword]);
             console.log('Default PM User created: pm / password123');
         } else {

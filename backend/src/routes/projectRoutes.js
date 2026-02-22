@@ -11,5 +11,7 @@ router.get('/:id', verifyToken, projectController.getProjectById);
 
 // Create Project - PM Only
 router.post('/', verifyToken, checkRole(['project_manager']), projectController.createProject);
+// Update Project Status - PM Only
+router.put('/:id/status', verifyToken, checkRole(['project_manager']), projectController.updateProjectStatus);
 
 module.exports = router;

@@ -48,6 +48,10 @@ export default function TeamsPage() {
     const [selectedLeaderId, setSelectedLeaderId] = useState('');
     const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
 
+    // Edit State
+    const [isEditing, setIsEditing] = useState(false);
+    const [editingTeamId, setEditingTeamId] = useState<number | null>(null);
+
     // Existing Add Member Modal (for editing existing teams)
     const [showAddMemberModal, setShowAddMemberModal] = useState(false);
     const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
@@ -89,14 +93,28 @@ export default function TeamsPage() {
 
     // --- Wizard Actions ---
 
-    const openWizard = () => {
+    const openWizard = (teamToEdit?: Team) => {
         fetchProjects();
         setStep(1);
-        setNewTeamName('');
-        setSelectedProjectId('');
-        setCreatedTeamId(null);
-        setSelectedLeaderId('');
-        setSelectedMemberIds([]);
+
+        if (teamToEdit) {
+            setIsEditing(true);
+            setEditingTeamId(teamToEdit.teamId);
+            setNewTeamName(teamToEdit.teamName);
+            setSelectedProjectId(teamToEdit.projectId.toString());
+            setCreatedTeamId(teamToEdit.teamId);
+            setSelectedLeaderId(teamToEdit.leader ? teamToEdit.leader.userId.toString() : '');
+            setSelectedMemberIds(teamToEdit.members.map(m => m.userId.toString()));
+        } else {
+            setIsEditing(false);
+            setEditingTeamId(null);
+            setNewTeamName('');
+            setSelectedProjectId('');
+            setCreatedTeamId(null);
+            setSelectedLeaderId('');
+            setSelectedMemberIds([]);
+        }
+
         setShowWizard(true);
     };
 
@@ -105,15 +123,20 @@ export default function TeamsPage() {
         if (!newTeamName || !selectedProjectId) return;
         setIsSubmitting(true);
         try {
-            const res = await api.post<Team>('/teams', {
-                teamName: newTeamName,
-                projectId: parseInt(selectedProjectId)
-            });
-            setCreatedTeamId(res.teamId);
-            setStep(2);
-            await fetchTeams(); // Refresh to see new team immediately behind modal
+            if (isEditing && editingTeamId) {
+                // Skiping backend save for step 1 when editing, we save everything at step 3
+                setStep(2);
+            } else {
+                const res = await api.post<Team>('/teams', {
+                    teamName: newTeamName,
+                    projectId: parseInt(selectedProjectId)
+                });
+                setCreatedTeamId(res.teamId);
+                setStep(2);
+                await fetchTeams(); // Refresh to see new team immediately behind modal
+            }
         } catch (err: any) {
-            alert(err.message || 'Failed to create team');
+            alert(err.message || 'Failed to process team');
         } finally {
             setIsSubmitting(false);
         }
@@ -123,17 +146,17 @@ export default function TeamsPage() {
         if (!createdTeamId || !selectedLeaderId) return;
         setIsSubmitting(true);
         try {
-            await api.post(`/teams/${createdTeamId}/members`, {
-                userId: selectedLeaderId,
-                role: 'leader' // Should technically be 'leader' but backend might expect 'member' with leader flag? 
-                // Wait, typically 'team_leader' is a user role, but in team context they are the leader.
-                // Assuming backend handles 'leader' role string or user role check.
-                // If backend only accepts 'member', we might need to adjust. 
-                // User requirement said "Select Team Leader". 
-            });
-            // Re-fetch to update
-            await fetchTeams();
-            setStep(3);
+            if (isEditing) {
+                // Delay save until step 3 for bulk edit
+                setStep(3);
+            } else {
+                await api.post(`/teams/${createdTeamId}/members`, {
+                    userId: selectedLeaderId,
+                    role: 'leader'
+                });
+                await fetchTeams();
+                setStep(3);
+            }
         } catch (err: any) {
             alert(err.message || 'Failed to assign leader');
         } finally {
@@ -145,20 +168,32 @@ export default function TeamsPage() {
         if (!createdTeamId) return;
         setIsSubmitting(true);
 
-        // Add all selected members
         try {
-            const promises = selectedMemberIds.map(userId =>
-                api.post(`/teams/${createdTeamId}/members`, {
-                    userId: userId,
-                    role: 'member'
-                })
-            );
-            await Promise.all(promises);
+            if (isEditing && editingTeamId) {
+                // Bulk save for edits
+                await api.put(`/teams/${editingTeamId}`, {
+                    teamName: newTeamName,
+                    projectId: parseInt(selectedProjectId),
+                    leaderId: selectedLeaderId,
+                    memberIds: selectedMemberIds,
+                });
+            } else {
+                // Add all selected members for new teams
+                if (selectedMemberIds.length > 0) {
+                    const promises = selectedMemberIds.map(userId =>
+                        api.post(`/teams/${createdTeamId}/members`, {
+                            userId: userId,
+                            role: 'member'
+                        })
+                    );
+                    await Promise.all(promises);
+                }
+            }
             await fetchTeams();
             setShowWizard(false);
-            alert('Team setup complete!');
+            alert(`Team ${isEditing ? 'updated' : 'setup'} complete!`);
         } catch (err: any) {
-            alert(err.message || 'Failed to add some members');
+            alert(err.message || 'Failed to complete team setup');
         } finally {
             setIsSubmitting(false);
         }
@@ -174,10 +209,9 @@ export default function TeamsPage() {
 
     // --- Helpers for Filtering Users ---
 
-    // Eligible Leaders: Project Managers or Team Leaders (or anyone if loose rules)
-    // For safety, let's allow 'project_manager' and 'team_leader' roles.
+    // Eligible Leaders: Only 'team_leader' role
     const getEligibleLeaders = () => {
-        return users.filter(u => u.role === 'team_leader' || u.role === 'project_manager');
+        return users.filter(u => u.role === 'team_leader');
     };
 
     // Eligible Workers: Role 'worker' primarily, or anyone not already leader
@@ -185,6 +219,16 @@ export default function TeamsPage() {
         return users.filter(u => u.userId.toString() !== selectedLeaderId && (u.role === 'worker' || u.role === 'user'));
     };
 
+    const handleDeleteTeam = async (teamId: number, teamName: string) => {
+        if (confirm(`Are you sure you want to delete ${teamName}? This action cannot be undone.`)) {
+            try {
+                await api.delete(`/teams/${teamId}`);
+                await fetchTeams();
+            } catch (err: any) {
+                alert(err.message || 'Failed to delete team');
+            }
+        }
+    };
 
     // --- Existing Add Member Logic (Single) ---
     const openAddMemberModal = (teamId: number) => {
@@ -218,7 +262,7 @@ export default function TeamsPage() {
         if (!team) return [];
         const memberIds = team.members.map(m => m.userId);
         if (team.leader) memberIds.push(team.leader.userId);
-        return users.filter(u => !memberIds.includes(u.userId));
+        return users.filter(u => !memberIds.includes(u.userId) && (u.role === 'worker' || u.role === 'user'));
     };
 
 
@@ -238,7 +282,7 @@ export default function TeamsPage() {
                 </div>
                 <div className="flex gap-4">
                     <button
-                        onClick={openWizard}
+                        onClick={() => openWizard()}
                         className="flex text-center justify-center items-center px-6 py-3 bg-linear-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-2xl shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:-translate-y-1 transition-all duration-300"
                     >
                         <PlusIcon className="w-5 h-5 mr-2" />
@@ -260,10 +304,19 @@ export default function TeamsPage() {
 
                         {/* Card Header (Gradient) */}
                         <div className="h-28 bg-linear-to-r from-brand-cyan to-brand-teal relative p-6">
+                            <div className="absolute top-4 right-4 z-20 flex gap-2">
+                                <button onClick={() => openWizard(team)} className="p-1.5 bg-white/20 hover:bg-white/40 text-white rounded-lg backdrop-blur-xs transition-colors" title="Edit Team">
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                </button>
+                                <button onClick={() => handleDeleteTeam(team.teamId, team.teamName)} className="p-1.5 bg-red-500/50 hover:bg-red-500/80 text-white rounded-lg backdrop-blur-xs transition-colors" title="Delete Team">
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                </button>
+                            </div>
+
                             <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-white/20 rounded-full blur-2xl"></div>
-                            <h2 className="text-white text-xl font-bold truncate relative z-10">{team.teamName}</h2>
-                            <div className="flex items-center text-cyan-100 text-xs font-bold mt-1 relative z-10 uppercase tracking-wider">
-                                <FolderIcon className="w-3 h-3 mr-1" />
+                            <h2 className="text-white text-xl font-bold truncate relative z-10 w-[70%]">{team.teamName}</h2>
+                            <div className="flex items-center text-cyan-100 text-xs font-bold mt-1 relative z-10 uppercase tracking-wider w-[70%] truncate">
+                                <FolderIcon className="w-3 h-3 flex-shrink-0 mr-1" />
                                 {team.projectTitle}
                             </div>
                         </div>
@@ -336,7 +389,7 @@ export default function TeamsPage() {
                 ))}
 
                 {/* Create New Team Card */}
-                <button onClick={openWizard} className="bg-white/50 dark:bg-gray-800/50 border-2 border-dashed border-brand-cyan/30 rounded-3xl flex flex-col items-center justify-center p-10 hover:border-brand-cyan hover:bg-cyan-50/50 dark:hover:bg-gray-800 transition-all duration-300 group cursor-pointer min-h-[400px]">
+                <button onClick={() => openWizard()} className="bg-white/50 dark:bg-gray-800/50 border-2 border-dashed border-brand-cyan/30 rounded-3xl flex flex-col items-center justify-center p-10 hover:border-brand-cyan hover:bg-cyan-50/50 dark:hover:bg-gray-800 transition-all duration-300 group cursor-pointer min-h-[400px]">
                     <div className="w-16 h-16 bg-cyan-50 dark:bg-cyan-900/20 text-brand-cyan rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-sm">
                         <PlusIcon className="w-8 h-8" />
                     </div>
@@ -355,9 +408,19 @@ export default function TeamsPage() {
 
                         <div className="flex justify-between items-center mb-6 mt-2">
                             <h2 className="text-2xl font-black text-gray-900 dark:text-white">
-                                {step === 1 && "Create Your Team"}
-                                {step === 2 && "Select a Leader"}
-                                {step === 3 && "Recruit Members"}
+                                {isEditing ? (
+                                    <>
+                                        {step === 1 && "Edit Team Info"}
+                                        {step === 2 && "Change Team Leader"}
+                                        {step === 3 && "Edit Members"}
+                                    </>
+                                ) : (
+                                    <>
+                                        {step === 1 && "Create Your Team"}
+                                        {step === 2 && "Select a Leader"}
+                                        {step === 3 && "Recruit Members"}
+                                    </>
+                                )}
                             </h2>
                             <button
                                 onClick={() => setShowWizard(false)}

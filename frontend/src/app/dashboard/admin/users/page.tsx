@@ -10,6 +10,7 @@ export default function UserManagementPage() {
     const [error, setError] = useState('');
     const [search, setSearch] = useState('');
     const [showCreateModal, setShowCreateModal] = useState(false);
+    const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
     // New User Form State
     const [newUser, setNewUser] = useState({
@@ -33,6 +34,11 @@ export default function UserManagementPage() {
     };
 
     useEffect(() => {
+        const userStr = localStorage.getItem('user');
+        if (userStr) {
+            const user = JSON.parse(userStr);
+            setCurrentUserId(user.userId);
+        }
         fetchUsers();
     }, []);
 
@@ -115,17 +121,19 @@ export default function UserManagementPage() {
 
                         {/* Role Color Stripe top */}
                         <div className={`absolute top-0 left-0 right-0 h-1.5 
-                            ${user.role === 'project_manager' ? 'bg-brand-peach' :
-                                user.role === 'team_leader' ? 'bg-brand-cyan' :
-                                    user.role === 'worker' ? 'bg-brand-sage' : 'bg-gray-300'
+                            ${user.role === 'admin' ? 'bg-purple-500' :
+                                user.role === 'project_manager' ? 'bg-brand-peach' :
+                                    user.role === 'team_leader' ? 'bg-brand-cyan' :
+                                        user.role === 'worker' ? 'bg-brand-sage' : 'bg-gray-300'
                             }`}>
                         </div>
 
                         <div className="w-20 h-20 rounded-full bg-gray-50 dark:bg-gray-700 p-1 mb-4 shadow-inner">
                             <div className={`w-full h-full rounded-full flex items-center justify-center text-2xl font-black uppercase
-                                ${user.role === 'project_manager' ? 'bg-brand-peach text-white' :
-                                    user.role === 'team_leader' ? 'bg-brand-cyan text-white' :
-                                        user.role === 'worker' ? 'bg-brand-sage text-white' : 'bg-gray-400 text-white'
+                                ${user.role === 'admin' ? 'bg-purple-500 text-white' :
+                                    user.role === 'project_manager' ? 'bg-brand-peach text-white' :
+                                        user.role === 'team_leader' ? 'bg-brand-cyan text-white' :
+                                            user.role === 'worker' ? 'bg-brand-sage text-white' : 'bg-gray-400 text-white'
                                 }`}>
                                 {user.firstName ? user.firstName.charAt(0) : user.username.charAt(0)}
                             </div>
@@ -135,26 +143,34 @@ export default function UserManagementPage() {
                         <p className="text-gray-400 dark:text-gray-500 text-xs font-bold mb-4 uppercase tracking-widest">@{user.username}</p>
 
                         <div className="mb-6">
-                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${user.role === 'project_manager' ? 'bg-brand-peach/10 text-brand-peach' :
-                                user.role === 'team_leader' ? 'bg-brand-cyan/10 text-brand-cyan' :
-                                    user.role === 'worker' ? 'bg-brand-sage/10 text-brand-sage' :
-                                        'bg-gray-100 dark:bg-gray-700 text-gray-500'
+                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${user.role === 'admin' ? 'bg-purple-500/10 text-purple-500' :
+                                user.role === 'project_manager' ? 'bg-brand-peach/10 text-brand-peach' :
+                                    user.role === 'team_leader' ? 'bg-brand-cyan/10 text-brand-cyan' :
+                                        user.role === 'worker' ? 'bg-brand-sage/10 text-brand-sage' :
+                                            'bg-gray-100 dark:bg-gray-700 text-gray-500'
                                 }`}>
                                 {user.role.replace('_', ' ')}
                             </span>
                         </div>
 
                         <div className="w-full mt-auto">
-                            <select
-                                value={user.role}
-                                onChange={(e) => handleRoleChange(user.userId, e.target.value as UserRole)}
-                                className="w-full py-2 px-3 bg-gray-50 dark:bg-gray-900 border-none rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-cyan cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                            >
-                                <option value="user">User</option>
-                                <option value="worker">Worker</option>
-                                <option value="team_leader">Team Leader</option>
-                                <option value="project_manager">Project Manager</option>
-                            </select>
+                            {user.userId === currentUserId ? (
+                                <div className="w-full py-2 px-3 bg-gray-100 dark:bg-gray-800 rounded-xl text-xs font-bold text-gray-400 dark:text-gray-500 text-center cursor-not-allowed border border-gray-200 dark:border-gray-700">
+                                    Current User
+                                </div>
+                            ) : (
+                                <select
+                                    value={user.role}
+                                    onChange={(e) => handleRoleChange(user.userId, e.target.value as UserRole)}
+                                    className="w-full py-2 px-3 bg-gray-50 dark:bg-gray-900 border-none rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-cyan cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                >
+                                    <option value="user">User</option>
+                                    <option value="worker">Worker</option>
+                                    <option value="team_leader">Team Leader</option>
+                                    <option value="project_manager">Project Manager</option>
+                                    <option value="admin">Admin</option>
+                                </select>
+                            )}
                         </div>
                     </div>
                 ))}
@@ -233,6 +249,7 @@ export default function UserManagementPage() {
                                     <option value="worker">Worker</option>
                                     <option value="team_leader">Team Leader</option>
                                     <option value="project_manager">Project Manager</option>
+                                    <option value="admin">Admin</option>
                                 </select>
                             </div>
 
