@@ -98,12 +98,14 @@ export default function ProjectsPage() {
         return teams;
     };
 
-    const filteredProjectss = projects.filter(p => {
+     const filteredProjectss = projects.filter(p => {
         const matchesSearch = p.title.toLowerCase().includes(search.toLowerCase());
         const matchesStatus = statusFilter === 'All Status' || p.status?.toLowerCase() === statusFilter.toLowerCase();
         let hasAccess = true;
-        const myTeams = getRoleBasedTeams();
-        hasAccess = myTeams.some(team => String(team.projectId) === String(p.projectId));
+        if (userRole === 'team_leader' || userRole === 'worker') {
+            const myTeams = getRoleBasedTeams();
+            hasAccess = myTeams.some(team => String(team.projectId) === String(p.projectId));
+        }
         return matchesSearch && matchesStatus && hasAccess;
     });
 
