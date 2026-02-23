@@ -57,9 +57,20 @@ export default function TeamsPage() {
     const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
     const [selectedUserId, setSelectedUserId] = useState<string>('');
 
+    const [userRole, setUserRole] = useState<string | null>(null);
+    const [userId, setUserId] = useState<string | null>(null);
+
     useEffect(() => {
         fetchTeams();
         fetchUsers();
+
+        const userStr = localStorage.getItem('user');
+        if (userStr) {
+            const user = JSON.parse(userStr);
+            setUserRole(user.role);
+            setUserId(user.userid);
+        }
+
     }, []);
 
     const fetchTeams = async () => {
@@ -209,6 +220,26 @@ export default function TeamsPage() {
 
     // --- Helpers for Filtering Users ---
 
+
+    const getRoleBasedTeams = () => {
+        if(userRole === 'team_leader') {
+            return teams.filter(t => {
+                const LeaderId = String(t.leader?.userId).trim();
+                const myId = String(userId).trim();
+                return LeaderId === myId;
+            });
+        }
+        else if (userRole === 'worker') {
+            return teams.filter(t => {
+                const myId = String(userId).trim();
+                return t.members?.some(member => String(member.userId).trim() === myId);
+            });
+        }
+
+        // Other role return all team
+        return teams; 
+    };
+
     // Eligible Leaders: Only 'team_leader' role
     const getEligibleLeaders = () => {
         return users.filter(u => u.role === 'team_leader');
@@ -280,38 +311,44 @@ export default function TeamsPage() {
                     <h1 className="text-4xl font-black text-gray-800 dark:text-white tracking-tight">Team Management</h1>
                     <p className="text-gray-500 dark:text-gray-400 mt-2 font-medium">Oversee your teams, assign leaders, and keep everyone organized.</p>
                 </div>
-                <div className="flex gap-4">
-                    <button
-                        onClick={() => openWizard()}
-                        className="flex text-center justify-center items-center px-6 py-3 bg-linear-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-2xl shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:-translate-y-1 transition-all duration-300"
-                    >
-                        <PlusIcon className="w-5 h-5 mr-2" />
-                        Create Team
-                    </button>
-                    <Link
-                        href="/dashboard/pm/users"
-                        className="flex text-center justify-center items-center px-6 py-3 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 font-bold rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-300"
-                    >
-                        Manage Users
-                    </Link>
-                </div>
+                {(userRole === 'project_manager') && ( 
+                    <div className="flex gap-4">
+                        <button
+                            onClick={() => openWizard()}
+                            className="flex text-center justify-center items-center px-6 py-3 bg-linear-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-2xl shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:-translate-y-1 transition-all duration-300"
+                        >
+                            <PlusIcon className="w-5 h-5 mr-2" />
+                            Create Team
+                        </button>
+                            {/*              
+                            <Link
+                                href="/dashboard/pm/users"
+                                className="flex text-center justify-center items-center px-6 py-3 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 font-bold rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-300"
+                            >
+                                Manage Users
+                            </Link> */}
+                    </div>
+                )} 
             </div>
 
             {/* Teams Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-                {teams.map((team) => (
+                {/* {teams.map((team) => ( */}
+                {getRoleBasedTeams().map((team) => (
                     <div key={team.teamId} className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm hover:shadow-xl hover:-translate-y-2 transition-all duration-300 border border-white/60 dark:border-gray-700 flex flex-col overflow-hidden group">
 
                         {/* Card Header (Gradient) */}
                         <div className="h-28 bg-linear-to-r from-brand-cyan to-brand-teal relative p-6">
-                            <div className="absolute top-4 right-4 z-20 flex gap-2">
-                                <button onClick={() => openWizard(team)} className="p-1.5 bg-white/20 hover:bg-white/40 text-white rounded-lg backdrop-blur-xs transition-colors" title="Edit Team">
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                                </button>
-                                <button onClick={() => handleDeleteTeam(team.teamId, team.teamName)} className="p-1.5 bg-red-500/50 hover:bg-red-500/80 text-white rounded-lg backdrop-blur-xs transition-colors" title="Delete Team">
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                </button>
-                            </div>
+                            {(userRole === 'project_manager') && ( 
+                                <div className="absolute top-4 right-4 z-20 flex gap-2">
+                                    <button onClick={() => openWizard(team)} className="p-1.5 bg-white/20 hover:bg-white/40 text-white rounded-lg backdrop-blur-xs transition-colors" title="Edit Team">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                    </button>
+                                    <button onClick={() => handleDeleteTeam(team.teamId, team.teamName)} className="p-1.5 bg-red-500/50 hover:bg-red-500/80 text-white rounded-lg backdrop-blur-xs transition-colors" title="Delete Team">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                    </button>
+                                </div>
+                            )} 
 
                             <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-white/20 rounded-full blur-2xl"></div>
                             <h2 className="text-white text-xl font-bold truncate relative z-10 w-[70%]">{team.teamName}</h2>
@@ -334,13 +371,15 @@ export default function TeamsPage() {
                                     <p className="text-sm font-bold text-gray-800 dark:text-gray-100 truncate max-w-[120px]">{team.leader?.name || 'Unassigned'}</p>
                                 </div>
                             </div>
-                            <button
-                                onClick={() => openAddMemberModal(team.teamId)}
-                                className="mb-4 bg-brand-sage/20 text-brand-sage p-3 rounded-xl hover:bg-brand-sage/30 hover:scale-110 transition-all font-bold shadow-sm"
-                                title="Add Member"
-                            >
-                                <UserPlusIcon className="w-5 h-5" />
-                            </button>
+                            {(userRole === 'project_manager' || userRole === 'team_leader') && ( 
+                                <button
+                                    onClick={() => openAddMemberModal(team.teamId)}
+                                    className="mb-4 bg-brand-sage/20 text-brand-sage p-3 rounded-xl hover:bg-brand-sage/30 hover:scale-110 transition-all font-bold shadow-sm"
+                                    title="Add Member"
+                                >
+                                    <UserPlusIcon className="w-5 h-5" />
+                                </button>
+                            )}
                         </div>
 
                         {/* Stats Summary */}
@@ -389,12 +428,14 @@ export default function TeamsPage() {
                 ))}
 
                 {/* Create New Team Card */}
-                <button onClick={() => openWizard()} className="bg-white/50 dark:bg-gray-800/50 border-2 border-dashed border-brand-cyan/30 rounded-3xl flex flex-col items-center justify-center p-10 hover:border-brand-cyan hover:bg-cyan-50/50 dark:hover:bg-gray-800 transition-all duration-300 group cursor-pointer min-h-[400px]">
-                    <div className="w-16 h-16 bg-cyan-50 dark:bg-cyan-900/20 text-brand-cyan rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-sm">
-                        <PlusIcon className="w-8 h-8" />
-                    </div>
-                    <h3 className="text-xl font-bold text-gray-400 group-hover:text-brand-cyan transition-colors">Create New Team</h3>
-                </button>
+                {(userRole === 'project_manager') && ( 
+                    <button onClick={() => openWizard()} className="bg-white/50 dark:bg-gray-800/50 border-2 border-dashed border-brand-cyan/30 rounded-3xl flex flex-col items-center justify-center p-10 hover:border-brand-cyan hover:bg-cyan-50/50 dark:hover:bg-gray-800 transition-all duration-300 group cursor-pointer min-h-[400px]">
+                        <div className="w-16 h-16 bg-cyan-50 dark:bg-cyan-900/20 text-brand-cyan rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-sm">
+                            <PlusIcon className="w-8 h-8" />
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-400 group-hover:text-brand-cyan transition-colors">Create New Team</h3>
+                    </button>
+                )} 
             </div>
 
             {/* --- WIZARD MODAL --- */}

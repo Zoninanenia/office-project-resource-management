@@ -9,12 +9,34 @@ interface ExtendedTask extends Task {
     projectName: string;
 }
 
+interface Member {
+    userId: number;
+    name: string;
+    username: string;
+    role: string;
+    profilePic: string | null;
+    totalTasks: number;
+    completedTasks: number;
+    progress: number;
+}
+
+interface Team {
+    teamId: number;
+    teamName: string;
+    projectId: number;
+    projectTitle: string;
+    leader: Member | null;
+    members: Member[];
+}
+
 export default function GlobalTasksPage() {
     const [tasks, setTasks] = useState<ExtendedTask[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [search, setSearch] = useState('');
     const [userRole, setUserRole] = useState<string | null>(null);
+    const [teams, setTeams] = useState<Team[]>([]);
+    const [userId, setUserId] = useState<string | null>(null);
 
     // Create/Edit Task Modal State
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -32,12 +54,15 @@ export default function GlobalTasksPage() {
         dependencies: [] as number[],
     });
     const [isAssigneeDropdownOpen, setIsAssigneeDropdownOpen] = useState(false);
+    const today = new Date().toISOString().split('T')[0];
+
 
     useEffect(() => {
         const userStr = localStorage.getItem('user');
         if (userStr) {
             const user = JSON.parse(userStr);
             setUserRole(user.role);
+            setUserId(user.userid);
         }
 
         const fetchTasks = async () => {
@@ -50,8 +75,24 @@ export default function GlobalTasksPage() {
                 setLoading(false);
             }
         };
+
+        const fetchTeams = async () => {
+            try {
+                const data = await api.get<Team[]>('/teams');
+                setTeams(data);
+            } catch (err) {
+                console.error('Failed to fetch teams', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+
         fetchTasks();
+        fetchTeams();
     }, []);
+
+ 
 
     // Fetch resources for modal
     const handleOpenCreateModal = async (taskToEdit?: ExtendedTask) => {
@@ -99,10 +140,44 @@ export default function GlobalTasksPage() {
         }
     };
 
+   const getRoleBasedTeams = () => {
+        if (userRole === 'team_leader') {
+            return teams.filter(t => {
+                return t.members?.some(member => String(member.userId).trim() === String(userId).trim());
+            });
+        }
+        return teams;
+    };
+
+    const filteredProjectss = projects.filter(p => {
+        const matchesSearch = p.title.toLowerCase().includes(search.toLowerCase());
+        let hasAccess = true;
+        const myTeams = getRoleBasedTeams();
+        hasAccess = myTeams.some(team => String(team.projectId) === String(p.projectId));
+        return matchesSearch && hasAccess;
+    });
+
+
+
     const handleCreateTask = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newTask.projectId) {
             alert('Please select a project');
+            return;
+        }
+
+        if (!newTask.taskName || !newTask.taskName.trim()) {
+            alert("Please enter a task name");
+            return;
+        }
+
+        if (!newTask.description || !newTask.description.trim()) {
+            alert("Please enter a description");
+            return;
+        }
+
+        if (!newTask.dueDate) {
+            alert("Please select a due date");
             return;
         }
 
@@ -296,9 +371,12 @@ export default function GlobalTasksPage() {
                         </h2>
                         <span className="bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-bold px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700">{todoTasks.length}</span>
                     </div>
-                    <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700">
-                        {todoTasks.map(task => <TaskCard key={task.taskId} task={task} />)}
+                    <div className="flex flex-col h-[850px] w-full max-w-md">
+                        <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700">
+                            {todoTasks.map(task => <TaskCard key={task.taskId} task={task} />)}
+                        </div>
                     </div>
+                    
                 </div>
 
                 {/* In Progress Column */}
@@ -309,9 +387,12 @@ export default function GlobalTasksPage() {
                         </h2>
                         <span className="bg-white dark:bg-gray-800 text-brand-cyan text-xs font-bold px-2.5 py-1 rounded-lg border border-cyan-100 dark:border-cyan-900">{inProgressTasks.length}</span>
                     </div>
-                    <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-cyan-200 dark:scrollbar-thumb-cyan-900">
-                        {inProgressTasks.map(task => <TaskCard key={task.taskId} task={task} />)}
+                    <div className="flex flex-col h-[850px] w-full max-w-md">
+                        <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-cyan-200 dark:scrollbar-thumb-cyan-900">
+                            {inProgressTasks.map(task => <TaskCard key={task.taskId} task={task} />)}
+                        </div>
                     </div>
+                    
                 </div>
 
                 {/* Done Column */}
@@ -322,9 +403,12 @@ export default function GlobalTasksPage() {
                         </h2>
                         <span className="bg-white dark:bg-gray-800 text-brand-sage text-xs font-bold px-2.5 py-1 rounded-lg border border-green-100 dark:border-green-900">{doneTasks.length}</span>
                     </div>
-                    <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-green-200 dark:scrollbar-thumb-green-900">
-                        {doneTasks.map(task => <TaskCard key={task.taskId} task={task} />)}
+                    <div className="flex flex-col h-[850px] w-full max-w-md">
+                        <div className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-green-200 dark:scrollbar-thumb-green-900">
+                            {doneTasks.map(task => <TaskCard key={task.taskId} task={task} />)}
+                        </div>
                     </div>
+                    
                 </div>
             </div>
 
@@ -348,7 +432,8 @@ export default function GlobalTasksPage() {
                                     disabled={isEditing} // usually changing project mid-flight is tricky, disabling for simpler UX
                                 >
                                     <option value="">Select a project...</option>
-                                    {projects.map(p => (
+                                    {/* {projects.map(p => ( */}
+                                    {filteredProjectss.map(p => (
                                         <option key={p.projectId} value={p.projectId}>{p.title}</option>
                                     ))}
                                 </select>
@@ -382,6 +467,7 @@ export default function GlobalTasksPage() {
                                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Due Date</label>
                                     <input
                                         type="date"
+                                        min={today}
                                         value={newTask.dueDate}
                                         onChange={e => setNewTask({ ...newTask, dueDate: e.target.value })}
                                         className="w-full p-3 bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-brand-cyan rounded-xl font-bold outline-none transition-all dark:text-white"

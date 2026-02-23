@@ -5,14 +5,48 @@ import { api } from '@/lib/api';
 import { Project } from '@/types';
 import Link from 'next/link';
 
+interface Member {
+    userId: number;
+    name: string;
+    username: string;
+    role: string;
+    profilePic: string | null;
+    totalTasks: number;
+    completedTasks: number;
+    progress: number;
+}
+
+interface Team {
+    teamId: number;
+    teamName: string;
+    projectId: number;
+    projectTitle: string;
+    leader: Member | null;
+    members: Member[];
+}
+
+
+export function getProjectProgress(teams: Team[], projectId: number): number {
+  const filtered = teams.filter((t) => t.projectId === projectId);
+  if (!filtered.length) return 0;
+  
+  const allMembers = filtered.flatMap((t) => t.members);
+  const unique = [...new Map(allMembers.map((m) => [m.userId, m])).values()];
+  const total = unique.reduce((sum, m) => sum + m.totalTasks, 0);
+  const completed = unique.reduce((sum, m) => sum + m.completedTasks, 0);
+  return total === 0 ? 0 : Math.round((completed / total) * 100);
+}
+
 export default function ProjectsPage() {
     const [projects, setProjects] = useState<Project[]>([]);
+    const [teams, setTeams] = useState<Team[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('All Status');
     const [userRole, setUserRole] = useState<string | null>(null);
-
+    const [userId, setUserId] = useState<string | null>(null);
+    
     useEffect(() => {
         const fetchProjects = async () => {
             try {
@@ -27,20 +61,52 @@ export default function ProjectsPage() {
             }
         };
 
+        const fetchTeams = async () => {
+            try {
+                const data = await api.get<Team[]>('/teams');
+                setTeams(data);
+            } catch (err) {
+                console.error('Failed to fetch teams', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
         const userStr = localStorage.getItem('user');
         if (userStr) {
             const user = JSON.parse(userStr);
             setUserRole(user.role);
+            setUserId(user.userid);
         }
 
         fetchProjects();
+        fetchTeams()
     }, []);
 
-    const filteredProjects = projects.filter(p => {
+    // const filteredProjects = projects.filter(p => {
+    //     const matchesSearch = p.title.toLowerCase().includes(search.toLowerCase());
+    //     const matchesStatus = statusFilter === 'All Status' || p.status?.toLowerCase() === statusFilter.toLowerCase();
+    //     return matchesSearch && matchesStatus;
+    // });
+    
+    const getRoleBasedTeams = () => {
+        if (userRole === 'team_leader' || userRole === 'worker') {
+            return teams.filter(t => {
+                return t.members?.some(member => String(member.userId).trim() === String(userId).trim());
+            });
+        }
+        return teams;
+    };
+
+    const filteredProjectss = projects.filter(p => {
         const matchesSearch = p.title.toLowerCase().includes(search.toLowerCase());
         const matchesStatus = statusFilter === 'All Status' || p.status?.toLowerCase() === statusFilter.toLowerCase();
-        return matchesSearch && matchesStatus;
+        let hasAccess = true;
+        const myTeams = getRoleBasedTeams();
+        hasAccess = myTeams.some(team => String(team.projectId) === String(p.projectId));
+        return matchesSearch && matchesStatus && hasAccess;
     });
+
 
     if (loading) return (
         <div className="flex items-center justify-center min-h-[500px]">
@@ -92,7 +158,8 @@ export default function ProjectsPage() {
 
             {/* Projects Grid (Adventure Cards) */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredProjects.map((project) => (
+                {/* {filteredProjects.map((project) => ( */}
+                {filteredProjectss.map((project) => (
                     <div key={project.projectId} className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm hover:shadow-xl hover:-translate-y-2 transition-all duration-300 border border-white/60 dark:border-gray-700 flex flex-col overflow-hidden group">
                         {/* Cover Image Simulation */}
                         <div className={`h-32 bg-linear-to-r ${getProjectGradient(project.status)} relative p-6`}>
@@ -115,16 +182,18 @@ export default function ProjectsPage() {
                             </p>
 
                             <div className="mt-auto">
+
                                 <div className="flex justify-between items-end mb-2">
                                     {/* Mock Progress - would be real in full app */}
                                     <span className="text-xs font-bold text-gray-400 uppercase">Progress</span>
-                                    <span className="text-sm font-black text-cyan-600 dark:text-cyan-400">45%</span>
+                                    <span className="text-sm font-black text-cyan-600 dark:text-cyan-400">{getProjectProgress(teams, project.projectId)}%</span>
                                 </div>
                                 <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-3 overflow-hidden mb-6">
-                                    <div className="bg-cyan-500 h-3 rounded-full relative overflow-hidden" style={{ width: '45%' }}>
+                                    <div className="bg-cyan-500 h-3 rounded-full relative overflow-hidden" style={{ width: `${getProjectProgress(teams, project.projectId)}%` }}>
                                         <div className="absolute inset-0 bg-white/30 animate-[shimmer_2s_infinite]"></div>
                                     </div>
                                 </div>
+
 
                                 <div className="flex items-center justify-between">
                                     <div className="text-gray-500 dark:text-gray-400 font-bold text-sm">
@@ -139,7 +208,7 @@ export default function ProjectsPage() {
                     </div>
                 ))}
 
-                {filteredProjects.length === 0 && (
+                {filteredProjectss.length === 0 && (
                     <div className="col-span-full py-20 text-center bg-white dark:bg-gray-800 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700">
                         <div className="w-20 h-20 bg-gray-50 dark:bg-gray-700/50 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-300 dark:text-gray-600">
                             <FolderIcon className="w-10 h-10" />
