@@ -80,3 +80,24 @@ exports.updateUserRole = async (req, res) => {
         res.status(500).send('Server Error');
     }
 };
+
+// reset Password
+exports.updatePassword = async (req, res) => {
+    const { id } = req.params;
+    const { password } = req.body;
+    
+    try {
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash(password, salt);
+
+        const result = await pool.query(
+            'UPDATE Users SET "passwordhash" = $1 WHERE "userid" = $2 RETURNING "passwordhash"',
+            [passwordHash, id]
+        );
+
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+};

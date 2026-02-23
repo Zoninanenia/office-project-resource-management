@@ -12,4 +12,7 @@ router.post('/', verifyToken, checkRole(['admin']), userController.createUser);
 // Update Role - Admin only
 router.put('/:id/role', verifyToken, checkRole(['admin']), userController.updateUserRole);
 
+// reset Password - All 
+router.put('/:id/newpassword', verifyToken, userController.updatePassword);
+
 module.exports = router;
