@@ -30,18 +30,9 @@ Note: Ensure your PostgreSQL server is running and the credentials in `.env` are
 
 ### 2. Backend Setup
 
-1.  Navigate to the `backend` directory:
-    ```bash
-    cd backend
-    ```
-2.  Install dependencies:
-    ```bash
-    npm install
-    ```
-3.  Configure environment variables:
-    - The `.env` file is already created with default settings.
+4.  Configure environment variables:
     - Check if `DB_PASSWORD` in `.env` matches your local PostgreSQL password.
-4.  Start the backend server:
+5.  Start the backend server:
     ```bash
     npm run dev
     ```
