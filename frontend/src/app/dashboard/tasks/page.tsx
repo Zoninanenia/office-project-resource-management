@@ -140,20 +140,19 @@ export default function GlobalTasksPage() {
         }
     };
 
-   const getRoleBasedTeams = () => {
-        if (userRole === 'team_leader') {
-            return teams.filter(t => {
-                return t.members?.some(member => String(member.userId).trim() === String(userId).trim());
-            });
-        }
-        return teams;
+    const getRoleBasedTeams = () => {
+        return teams.filter(t => {
+            return t.members?.some(member => String(member.userId).trim() === String(userId).trim());
+        });
     };
 
     const filteredProjectss = projects.filter(p => {
         const matchesSearch = p.title.toLowerCase().includes(search.toLowerCase());
         let hasAccess = true;
-        const myTeams = getRoleBasedTeams();
-        hasAccess = myTeams.some(team => String(team.projectId) === String(p.projectId));
+        if (userRole === 'team_leader' || userRole === 'worker' || userRole === 'user') {
+            const myTeams = getRoleBasedTeams();
+            hasAccess = myTeams.some(team => String(team.projectId) === String(p.projectId));
+        }
         return matchesSearch && hasAccess;
     });
 

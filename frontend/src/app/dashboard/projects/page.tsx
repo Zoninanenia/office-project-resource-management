@@ -88,26 +88,27 @@ export default function ProjectsPage() {
     //     const matchesStatus = statusFilter === 'All Status' || p.status?.toLowerCase() === statusFilter.toLowerCase();
     //     return matchesSearch && matchesStatus;
     // });
+
     
     const getRoleBasedTeams = () => {
-        if (userRole === 'team_leader' || userRole === 'worker') {
-            return teams.filter(t => {
-                return t.members?.some(member => String(member.userId).trim() === String(userId).trim());
-            });
-        }
-        return teams;
+        return teams.filter(t => {
+            return t.members?.some(member => String(member.userId).trim() === String(userId).trim());
+        });
     };
 
-     const filteredProjectss = projects.filter(p => {
+    const filteredProjectss = projects.filter(p => {
         const matchesSearch = p.title.toLowerCase().includes(search.toLowerCase());
         const matchesStatus = statusFilter === 'All Status' || p.status?.toLowerCase() === statusFilter.toLowerCase();
         let hasAccess = true;
-        if (userRole === 'team_leader' || userRole === 'worker') {
+        if (userRole === 'team_leader' || userRole === 'worker' || userRole === 'user') {
             const myTeams = getRoleBasedTeams();
             hasAccess = myTeams.some(team => String(team.projectId) === String(p.projectId));
         }
         return matchesSearch && matchesStatus && hasAccess;
     });
+
+    
+
 
 
     if (loading) return (

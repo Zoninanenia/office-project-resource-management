@@ -229,7 +229,7 @@ export default function TeamsPage() {
                 return LeaderId === myId;
             });
         }
-        else if (userRole === 'worker') {
+        else if (userRole === 'worker' || userRole === 'user') {
             return teams.filter(t => {
                 const myId = String(userId).trim();
                 return t.members?.some(member => String(member.userId).trim() === myId);
