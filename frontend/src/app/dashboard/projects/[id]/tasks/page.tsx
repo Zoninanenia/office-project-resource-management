@@ -344,10 +344,10 @@ export default function ProjectTasksPage() {
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Must be finished after (Dependencies)</label>
                                 <div className="max-h-40 overflow-y-auto border rounded p-2 dark:bg-gray-700 dark:border-gray-600">
-                                    {tasks.length === 0 ? (
+                                    {tasks.filter(t => t.taskId !== editingTaskId).length === 0 ? (
                                         <p className="text-sm text-gray-500">No existing tasks.</p>
                                     ) : (
-                                        tasks.map((t: any) => (
+                                        tasks.filter(t => t.taskId !== editingTaskId).map((t: any) => (
                                             <div key={`dep-${t.taskId}`} className="flex items-center space-x-2 py-1">
                                                 <input
                                                     type="checkbox"

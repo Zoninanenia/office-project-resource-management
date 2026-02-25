@@ -59,9 +59,8 @@ export default function GlobalTasksPage() {
     const [isAssigneeDropdownOpen, setIsAssigneeDropdownOpen] = useState(false);
     const today = new Date().toISOString().split('T')[0];
 
-    // Dependency drag-and-drop state
-    const [depDropTarget, setDepDropTarget] = useState<number | null>(null);
-    const [depClearTarget, setDepClearTarget] = useState<string | null>(null);
+    // Reorder-based dependency drag state
+    const [dropSlotKey, setDropSlotKey] = useState<string | null>(null);
     const [savingDep, setSavingDep] = useState(false);
 
 
@@ -259,30 +258,37 @@ export default function GlobalTasksPage() {
         return matchSearch && matchTeam;
     });
 
-    const todoTasks = filteredTasks.filter(t => t.status === 'todo');
-    const inProgressTasks = filteredTasks.filter(t => t.status === 'in_progress');
-    const doneTasks = filteredTasks.filter(t => t.status === 'done' || t.status === 'review');
+    // Sort helper: by due date ascending (null dates last)
+    const sortByDueDate = (arr: ExtendedTask[]) => [...arr].sort((a, b) => {
+        if (!a.dueDate && !b.dueDate) return 0;
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+    });
 
-    // ฟังก์ชันเริ่มลากการ์ด
+    const todoTasks = sortByDueDate(filteredTasks.filter(t => t.status === 'todo'));
+    const inProgressTasks = sortByDueDate(filteredTasks.filter(t => t.status === 'in_progress'));
+    const doneTasks = sortByDueDate(filteredTasks.filter(t => t.status === 'done' || t.status === 'review'));
+
+    // Drag start for cards
     const handleDragStart = (e: React.DragEvent, taskId: number) => {
         e.dataTransfer.setData('taskId', taskId.toString());
         e.dataTransfer.effectAllowed = 'move';
     };
 
-    // ฟังก์ชันอนุญาตให้วางทับได้ (จำเป็นต้องมี)
+    // Allow column-level drop for status change
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
     };
 
     const handleDragEnd = () => {
-        setDepDropTarget(null);
-        setDepClearTarget(null);
+        setDropSlotKey(null);
     };
 
-    // ฟังก์ชันเมื่อปล่อยการ์ดลงคอลัมน์ใหม่ (status change)
+    // Drop on a column -> status change (unchanged behavior)
     const handleDrop = async (e: React.DragEvent, newStatus: string) => {
         e.preventDefault();
-        setDepClearTarget(null);
+        setDropSlotKey(null);
         const taskIdStr = e.dataTransfer.getData('taskId');
         if (!taskIdStr) return;
 
@@ -309,21 +315,46 @@ export default function GlobalTasksPage() {
         }
     };
 
-    // Drop a card ON another card -> set dependency
-    const handleDropOnCard = async (e: React.DragEvent, targetTaskId: number) => {
+    // Drop at a slot between cards within a column -> set dependency
+    const handleDropAtSlot = async (e: React.DragEvent, columnTasks: ExtendedTask[], slotIndex: number) => {
         e.preventDefault();
-        e.stopPropagation(); // prevent column-level drop (status change)
-        setDepDropTarget(null);
+        e.stopPropagation();
+        setDropSlotKey(null);
 
         const taskIdStr = e.dataTransfer.getData('taskId');
         if (!taskIdStr) return;
         const dragId = parseInt(taskIdStr, 10);
-        if (dragId === targetTaskId) return;
 
         const draggedTask = tasks.find(t => t.taskId === dragId);
         if (!draggedTask) return;
 
-        const newDeps = [targetTaskId];
+        // If the task is coming from a different column, also update status
+        const targetColumnStatus = columnTasks.length > 0 ? columnTasks[0].status : null;
+        if (targetColumnStatus && draggedTask.status !== targetColumnStatus) {
+            // Status change + dependency in one go
+            setTasks(prev => prev.map(t =>
+                t.taskId === dragId ? { ...t, status: targetColumnStatus as any } : t
+            ));
+            try {
+                await api.put(`/tasks/${dragId}/status`, { status: targetColumnStatus });
+            } catch (err: any) {
+                // Rollback status
+                setTasks(prev => prev.map(t =>
+                    t.taskId === dragId ? { ...t, status: draggedTask.status } : t
+                ));
+            }
+        }
+
+        // slotIndex 0 = top (clear deps), slotIndex N = after task N-1 (set dep)
+        let newDeps: number[] = [];
+        if (slotIndex > 0) {
+            const taskAbove = columnTasks[slotIndex - 1];
+            if (taskAbove && taskAbove.taskId !== dragId) {
+                newDeps = [taskAbove.taskId];
+            }
+        }
+
+        // Skip if dependencies are already the same
         const currentDeps = [...(draggedTask.dependencies || [])].sort();
         const newDepsSorted = [...newDeps].sort();
         if (JSON.stringify(currentDeps) === JSON.stringify(newDepsSorted)) return;
@@ -333,7 +364,6 @@ export default function GlobalTasksPage() {
             await api.put(`/tasks/${dragId}`, {
                 taskName: draggedTask.taskName,
                 description: draggedTask.description,
-                dueDate: draggedTask.dueDate || '',
                 dependencies: newDeps,
             });
             setTasks(prev => prev.map(t =>
@@ -347,64 +377,14 @@ export default function GlobalTasksPage() {
         }
     };
 
-    // Drop on the clear zone -> remove all dependencies
-    const handleDropOnClearZone = async (e: React.DragEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setDepClearTarget(null);
-
-        const taskIdStr = e.dataTransfer.getData('taskId');
-        if (!taskIdStr) return;
-        const dragId = parseInt(taskIdStr, 10);
-
-        const draggedTask = tasks.find(t => t.taskId === dragId);
-        if (!draggedTask) return;
-
-        const currentDeps = draggedTask.dependencies || [];
-        if (currentDeps.length === 0) return;
-
-        setSavingDep(true);
-        try {
-            await api.put(`/tasks/${dragId}`, {
-                taskName: draggedTask.taskName,
-                description: draggedTask.description,
-                dueDate: draggedTask.dueDate || '',
-                dependencies: [],
-            });
-            setTasks(prev => prev.map(t =>
-                t.taskId === dragId ? { ...t, dependencies: [] } : t
-            ));
-        } catch (err: any) {
-            console.error('Failed to clear dependencies', err);
-            alert(err.message || 'Failed to clear dependencies');
-        } finally {
-            setSavingDep(false);
-        }
-    };
-
     const getTaskNameById = (id: number) => tasks.find(t => t.taskId === id)?.taskName || `Task #${id}`;
 
     const TaskCard = ({ task }: { task: ExtendedTask }) => (
-
         <div
             draggable
             onDragStart={(e) => handleDragStart(e, task.taskId)}
             onDragEnd={handleDragEnd}
-            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move'; setDepDropTarget(task.taskId); }}
-            onDragLeave={() => setDepDropTarget(null)}
-            onDrop={(e) => handleDropOnCard(e, task.taskId)}
-            className={`bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border-2 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 mb-4 group relative overflow-hidden cursor-grab active:cursor-grabbing ${depDropTarget === task.taskId
-                ? 'border-cyan-400 dark:border-cyan-400 bg-cyan-50/50 dark:bg-cyan-900/10 shadow-lg shadow-cyan-200/50 dark:shadow-cyan-900/30 scale-[1.02]'
-                : 'border-gray-100 dark:border-gray-700'
-                }`}>
-            {/* Dependency drop overlay */}
-            {depDropTarget === task.taskId && (
-                <div className="absolute inset-0 flex items-center justify-center bg-cyan-400/10 dark:bg-cyan-400/5 z-20 rounded-2xl pointer-events-none">
-                    <span className="text-xs font-black text-cyan-500 bg-white dark:bg-gray-800 px-3 py-1.5 rounded-lg shadow-md">
-                        Drop to depend on "{task.taskName}"
-                    </span>
-                </div>
-            )}
+            className={`bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border-2 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden cursor-grab active:cursor-grabbing border-gray-100 dark:border-gray-700`}>
 
             {/* Project Stripe */}
             <div
@@ -515,6 +495,41 @@ export default function GlobalTasksPage() {
         </div>
     );
 
+    // Render a column's tasks with drop slots between them
+    const renderColumnTasks = (columnTasks: ExtendedTask[], columnKey: string) => (
+        <>
+            {/* Drop slot at the top — PM only */}
+            {userRole === 'project_manager' && (
+                <div
+                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDropSlotKey(`${columnKey}-0`); }}
+                    onDragLeave={() => setDropSlotKey(null)}
+                    onDrop={(e) => handleDropAtSlot(e, columnTasks, 0)}
+                    className={`transition-all duration-200 rounded-xl ${dropSlotKey === `${columnKey}-0`
+                        ? 'h-3 bg-cyan-400 dark:bg-cyan-500 my-1 shadow-md shadow-cyan-300/50'
+                        : 'h-1'
+                        }`}
+                />
+            )}
+            {columnTasks.map((task, index) => (
+                <div key={task.taskId}>
+                    <TaskCard task={task} />
+                    {/* Drop slot after this card — PM only */}
+                    {userRole === 'project_manager' && (
+                        <div
+                            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDropSlotKey(`${columnKey}-${index + 1}`); }}
+                            onDragLeave={() => setDropSlotKey(null)}
+                            onDrop={(e) => handleDropAtSlot(e, columnTasks, index + 1)}
+                            className={`transition-all duration-200 rounded-xl ${dropSlotKey === `${columnKey}-${index + 1}`
+                                ? 'h-3 bg-cyan-400 dark:bg-cyan-500 my-1 shadow-md shadow-cyan-300/50'
+                                : 'h-1'
+                                }`}
+                        />
+                    )}
+                </div>
+            ))}
+        </>
+    );
+
     if (loading) return (
         <div className="flex items-center justify-center h-screen">
             <div className="w-16 h-16 border-4 border-brand-cyan border-t-brand-teal rounded-full animate-spin"></div>
@@ -586,30 +601,16 @@ export default function GlobalTasksPage() {
                     <div className="flex flex-col h-[850px] w-full max-w-md">
                         <div
                             className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700">
-                            {/* Clear dependencies zone */}
-                            <div
-                                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDepClearTarget('todo'); }}
-                                onDragLeave={() => setDepClearTarget(null)}
-                                onDrop={handleDropOnClearZone}
-                                className={`rounded-xl border-2 border-dashed transition-all duration-200 text-center text-[10px] font-bold mb-2 ${depClearTarget === 'todo'
-                                    ? 'border-cyan-400 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-500 py-3'
-                                    : 'border-transparent py-0 h-0 overflow-hidden'
-                                    }`}
-                            >
-                                {depClearTarget === 'todo' && '↑ Drop here to clear dependencies'}
-                            </div>
-                            {todoTasks.map(task => <TaskCard key={task.taskId} task={task} />)}
-                        </div >
-                    </div >
-
-                </div >
+                            {renderColumnTasks(todoTasks, 'todo')}
+                        </div>
+                    </div>
+                </div>
 
                 {/* In Progress Column */}
-                < div
+                <div
                     className="flex flex-col h-full bg-cyan-50/30 dark:bg-cyan-900/10 rounded-3xl p-4 border border-cyan-100 dark:border-cyan-900/30"
                     onDragOver={handleDragOver}
-                    onDrop={(e) => handleDrop(e, 'in_progress')
-                    }
+                    onDrop={(e) => handleDrop(e, 'in_progress')}
                 >
                     <div className="flex items-center justify-between mb-4 px-2">
                         <h2 className="text-lg font-black text-gray-700 dark:text-gray-200 flex items-center gap-2">
@@ -621,26 +622,13 @@ export default function GlobalTasksPage() {
                     <div className="flex flex-col h-[850px] w-full max-w-md">
                         <div
                             className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-cyan-200 dark:scrollbar-thumb-cyan-900">
-                            {/* Clear dependencies zone */}
-                            <div
-                                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDepClearTarget('in_progress'); }}
-                                onDragLeave={() => setDepClearTarget(null)}
-                                onDrop={handleDropOnClearZone}
-                                className={`rounded-xl border-2 border-dashed transition-all duration-200 text-center text-[10px] font-bold mb-2 ${depClearTarget === 'in_progress'
-                                    ? 'border-cyan-400 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-500 py-3'
-                                    : 'border-transparent py-0 h-0 overflow-hidden'
-                                    }`}
-                            >
-                                {depClearTarget === 'in_progress' && '↑ Drop here to clear dependencies'}
-                            </div>
-                            {inProgressTasks.map(task => <TaskCard key={task.taskId} task={task} />)}
-                        </div >
-                    </div >
-
-                </div >
+                            {renderColumnTasks(inProgressTasks, 'in_progress')}
+                        </div>
+                    </div>
+                </div>
 
                 {/* Done Column */}
-                < div
+                <div
                     className="flex flex-col h-full bg-green-50/30 dark:bg-green-900/10 rounded-3xl p-4 border border-green-100 dark:border-green-900/30"
                     onDragOver={handleDragOver}
                     onDrop={(e) => handleDrop(e, 'done')}
@@ -655,24 +643,11 @@ export default function GlobalTasksPage() {
                     <div className="flex flex-col h-[850px] w-full max-w-md">
                         <div
                             className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-green-200 dark:scrollbar-thumb-green-900">
-                            {/* Clear dependencies zone */}
-                            <div
-                                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDepClearTarget('done'); }}
-                                onDragLeave={() => setDepClearTarget(null)}
-                                onDrop={handleDropOnClearZone}
-                                className={`rounded-xl border-2 border-dashed transition-all duration-200 text-center text-[10px] font-bold mb-2 ${depClearTarget === 'done'
-                                    ? 'border-cyan-400 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-500 py-3'
-                                    : 'border-transparent py-0 h-0 overflow-hidden'
-                                    }`}
-                            >
-                                {depClearTarget === 'done' && '↑ Drop here to clear dependencies'}
-                            </div>
-                            {doneTasks.map(task => <TaskCard key={task.taskId} task={task} />)}
-                        </div >
-                    </div >
-
-                </div >
-            </div >
+                            {renderColumnTasks(doneTasks, 'done')}
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             {/* Create Task Modal */}
             {
@@ -827,7 +802,7 @@ export default function GlobalTasksPage() {
                                         <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Must be finished after (Dependencies)</label>
                                         <div className="max-h-40 overflow-y-auto border-2 border-transparent bg-gray-50 dark:bg-gray-700 rounded-xl p-2 focus-within:border-brand-cyan transition-all">
                                             {(() => {
-                                                const projectTasks = tasks.filter(t => t.projectId.toString() === newTask.projectId);
+                                                const projectTasks = tasks.filter(t => t.projectId.toString() === newTask.projectId && t.taskId !== editingTaskId);
                                                 if (projectTasks.length === 0) {
                                                     return <p className="text-xs text-gray-400 font-medium p-2">No existing tasks in this project.</p>;
                                                 }

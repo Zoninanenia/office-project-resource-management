@@ -191,43 +191,25 @@ export default function ProjectDetailPage() {
     // Fallback status if missing from backend
     const status = project.status || 'active';
 
-    // --- Topological sort: order tasks so prerequisites come first ---
-    const sortedTasks = (() => {
-        if (tasks.length === 0) return [];
-        const taskMap = new Map(tasks.map(t => [t.taskId, t]));
-        const visited = new Set<number>();
-        const result: Task[] = [];
+    // --- Sort tasks by due date (earliest first, null dates last) ---
+    const sortedTasks = [...tasks].sort((a, b) => {
+        if (!a.dueDate && !b.dueDate) return 0;
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+    });
 
-        const visit = (id: number) => {
-            if (visited.has(id)) return;
-            visited.add(id);
-            const task = taskMap.get(id);
-            if (!task) return;
-            // Visit dependencies first
-            if (task.dependencies) {
-                for (const depId of task.dependencies) {
-                    visit(depId);
-                }
-            }
-            result.push(task);
-        };
-
-        for (const t of tasks) visit(t.taskId);
-        return result;
-    })();
-
-    // --- Drag-and-drop handlers ---
+    // --- Drag-and-drop handlers (reorder-based dependency) ---
     const handleDragStart = (e: React.DragEvent, taskId: number) => {
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', taskId.toString());
-        // Use setTimeout so the dragged element doesn't disappear instantly
         setTimeout(() => setDraggedTaskId(taskId), 0);
     };
 
-    const handleDragOverCard = (e: React.DragEvent, index: number) => {
+    const handleDragOverSlot = (e: React.DragEvent, slotIndex: number) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
-        setDropTargetIndex(index);
+        setDropTargetIndex(slotIndex);
     };
 
     const handleDragLeave = () => {
@@ -239,7 +221,8 @@ export default function ProjectDetailPage() {
         setDropTargetIndex(null);
     };
 
-    const handleDropOnCard = async (e: React.DragEvent, dropOnIndex: number) => {
+    // Drop at a slot position — the task above becomes the dependency
+    const handleDropAtSlot = async (e: React.DragEvent, slotIndex: number) => {
         e.preventDefault();
         e.stopPropagation();
         const taskIdStr = e.dataTransfer.getData('text/plain');
@@ -249,11 +232,15 @@ export default function ProjectDetailPage() {
         const draggedTask = tasks.find(t => t.taskId === dragId);
         if (!draggedTask) { handleDragEnd(); return; }
 
-        const targetTask = sortedTasks[dropOnIndex];
-        if (!targetTask || targetTask.taskId === dragId) { handleDragEnd(); return; }
-
-        // Set the dragged task's dependency to the target task
-        const newDeps: number[] = [targetTask.taskId];
+        // slotIndex 0 = top (no task above → clear deps)
+        // slotIndex N = after sortedTasks[N-1] → depend on sortedTasks[N-1]
+        let newDeps: number[] = [];
+        if (slotIndex > 0) {
+            const taskAbove = sortedTasks[slotIndex - 1];
+            if (taskAbove && taskAbove.taskId !== dragId) {
+                newDeps = [taskAbove.taskId];
+            }
+        }
 
         // Skip if dependencies are already the same
         const currentDeps = [...(draggedTask.dependencies || [])].sort();
@@ -268,52 +255,15 @@ export default function ProjectDetailPage() {
             await api.put(`/tasks/${dragId}`, {
                 taskName: draggedTask.taskName,
                 description: draggedTask.description,
-                dueDate: draggedTask.dueDate || '',
                 dependencies: newDeps,
             });
 
-            // Update local state
             setTasks(prev => prev.map(t =>
                 t.taskId === dragId ? { ...t, dependencies: newDeps } : t
             ));
         } catch (err: any) {
             console.error('Failed to update dependencies', err);
             alert(err.message || 'Failed to update dependencies');
-        } finally {
-            setSavingDep(false);
-            handleDragEnd();
-        }
-    };
-
-    // Drop on the "clear dependencies" zone at the top
-    const handleDropOnClearZone = async (e: React.DragEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const taskIdStr = e.dataTransfer.getData('text/plain');
-        const dragId = taskIdStr ? parseInt(taskIdStr, 10) : draggedTaskId;
-        if (dragId === null) { handleDragEnd(); return; }
-
-        const draggedTask = tasks.find(t => t.taskId === dragId);
-        if (!draggedTask) { handleDragEnd(); return; }
-
-        const currentDeps = draggedTask.dependencies || [];
-        if (currentDeps.length === 0) { handleDragEnd(); return; }
-
-        setSavingDep(true);
-        try {
-            await api.put(`/tasks/${dragId}`, {
-                taskName: draggedTask.taskName,
-                description: draggedTask.description,
-                dueDate: draggedTask.dueDate || '',
-                dependencies: [],
-            });
-
-            setTasks(prev => prev.map(t =>
-                t.taskId === dragId ? { ...t, dependencies: [] } : t
-            ));
-        } catch (err: any) {
-            console.error('Failed to clear dependencies', err);
-            alert(err.message || 'Failed to clear dependencies');
         } finally {
             setSavingDep(false);
             handleDragEnd();
@@ -414,145 +364,144 @@ export default function ProjectDetailPage() {
                         </div>
 
                         {sortedTasks.length > 0 ? (
-                            <div className="grid gap-2">
-                                {/* Drop here to clear dependencies */}
-                                <div
-                                    onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDropTargetIndex(-1); }}
-                                    onDragLeave={handleDragLeave}
-                                    onDrop={handleDropOnClearZone}
-                                    className={`rounded-2xl border-2 border-dashed transition-all duration-200 text-center text-xs font-bold ${dropTargetIndex === -1 && draggedTaskId !== null
-                                            ? 'border-cyan-400 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-500 py-4'
-                                            : draggedTaskId !== null
-                                                ? 'border-gray-200 dark:border-gray-700 text-gray-400 py-3'
-                                                : 'border-transparent py-0 h-0 overflow-hidden'
-                                        }`}
-                                >
-                                    {draggedTaskId !== null && '↑ Drop here to clear dependencies'}
-                                </div>
+                            <div className="grid gap-0">
+                                {/* Drop slot at the very top (position 0 = clear deps) — PM only */}
+                                {currentUserRole === 'project_manager' && (
+                                    <div
+                                        onDragOver={(e) => handleDragOverSlot(e, 0)}
+                                        onDragLeave={handleDragLeave}
+                                        onDrop={(e) => handleDropAtSlot(e, 0)}
+                                        className={`transition-all duration-200 rounded-xl ${dropTargetIndex === 0 && draggedTaskId !== null
+                                            ? 'h-3 bg-cyan-400 dark:bg-cyan-500 my-1 shadow-md shadow-cyan-300/50'
+                                            : 'h-1'
+                                            }`}
+                                    />
+                                )}
 
                                 {sortedTasks.map((task, index) => (
-                                    <div
-                                        key={task.taskId}
-                                        draggable
-                                        onDragStart={(e) => handleDragStart(e, task.taskId)}
-                                        onDragEnd={handleDragEnd}
-                                        onDragOver={(e) => handleDragOverCard(e, index)}
-                                        onDragLeave={handleDragLeave}
-                                        onDrop={(e) => handleDropOnCard(e, index)}
-                                        className={`bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border-2 transition-all group hover:-translate-y-0.5 hover:shadow-md relative overflow-hidden ${draggedTaskId === task.taskId
+                                    <div key={task.taskId}>
+                                        <div
+                                            draggable={currentUserRole === 'project_manager'}
+                                            onDragStart={(e) => currentUserRole === 'project_manager' && handleDragStart(e, task.taskId)}
+                                            onDragEnd={handleDragEnd}
+                                            className={`bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border-2 transition-all group hover:-translate-y-0.5 hover:shadow-md relative overflow-hidden mb-2 ${draggedTaskId === task.taskId
                                                 ? 'opacity-40 scale-95 border-cyan-400 dark:border-cyan-500'
-                                                : dropTargetIndex === index && draggedTaskId !== null && draggedTaskId !== task.taskId
-                                                    ? 'border-cyan-400 dark:border-cyan-400 bg-cyan-50/50 dark:bg-cyan-900/10 shadow-lg shadow-cyan-200/50 dark:shadow-cyan-900/30 scale-[1.02]'
-                                                    : 'border-gray-100 dark:border-gray-700 hover:border-cyan-400 dark:hover:border-cyan-500'
-                                            }`}
-                                        style={{ cursor: 'grab' }}
-                                    >
-                                        {/* Drop indicator overlay */}
-                                        {dropTargetIndex === index && draggedTaskId !== null && draggedTaskId !== task.taskId && (
-                                            <div className="absolute inset-0 flex items-center justify-center bg-cyan-400/10 dark:bg-cyan-400/5 z-20 rounded-2xl pointer-events-none">
-                                                <span className="text-xs font-black text-cyan-500 bg-white dark:bg-gray-800 px-3 py-1.5 rounded-lg shadow-md">
-                                                    Drop to depend on "{task.taskName}"
-                                                </span>
-                                            </div>
-                                        )}
+                                                : 'border-gray-100 dark:border-gray-700 hover:border-cyan-400 dark:hover:border-cyan-500'
+                                                }`}
+                                            style={{ cursor: currentUserRole === 'project_manager' ? 'grab' : 'default' }}
+                                        >
+                                            {/* Project Stripe */}
+                                            <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-brand-teal group-hover:bg-brand-cyan transition-colors"></div>
 
-                                        {/* Project Stripe */}
-                                        <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-brand-teal group-hover:bg-brand-cyan transition-colors"></div>
+                                            <div className="flex items-start gap-4 pl-3">
+                                                {/* Drag handle — only visible for PM */}
+                                                {currentUserRole === 'project_manager' && (
+                                                    <DragHandleIcon className="w-5 h-5 text-gray-300 dark:text-gray-600 group-hover:text-gray-400 flex-shrink-0 mt-1" />
+                                                )}
 
-                                        <div className="flex items-start gap-4 pl-3">
-                                            {/* Drag handle */}
-                                            <DragHandleIcon className="w-5 h-5 text-gray-300 dark:text-gray-600 group-hover:text-gray-400 flex-shrink-0 mt-1" />
+                                                <div className={`w-3 h-3 rounded-full ${getStatusColor(task.status)} ring-2 ring-white dark:ring-gray-800 flex-shrink-0 mt-2`}></div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex justify-between items-start">
+                                                        <h3 className="font-bold text-sm text-gray-800 dark:text-gray-200 group-hover:text-cyan-500 transition-colors line-clamp-2 leading-tight pr-16">{task.taskName}</h3>
 
-                                            <div className={`w-3 h-3 rounded-full ${getStatusColor(task.status)} ring-2 ring-white dark:ring-gray-800 flex-shrink-0 mt-2`}></div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex justify-between items-start">
-                                                    <h3 className="font-bold text-sm text-gray-800 dark:text-gray-200 group-hover:text-cyan-500 transition-colors line-clamp-2 leading-tight pr-16">{task.taskName}</h3>
+                                                        {/* Edit/Delete buttons for PM/TL */}
+                                                        {(currentUserRole === 'project_manager' || currentUserRole === 'team_leader') && (
+                                                            <div className="absolute top-3 right-3 flex gap-1 z-10">
+                                                                <button onClick={(e) => { e.stopPropagation(); handleOpenCreateModal(task); }}
+                                                                    className="p-1.5 text-gray-400 hover:text-brand-cyan hover:bg-cyan-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                                                    title="Edit Task">
+                                                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                                            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                                    </svg>
+                                                                </button>
+                                                                <button onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.taskId, task.taskName); }}
+                                                                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                                                    title="Delete Task">
+                                                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                                    </svg>
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
 
-                                                    {/* Edit/Delete buttons for PM/TL */}
-                                                    {(currentUserRole === 'project_manager' || currentUserRole === 'team_leader') && (
-                                                        <div className="absolute top-3 right-3 flex gap-1 z-10">
-                                                            <button onClick={(e) => { e.stopPropagation(); handleOpenCreateModal(task); }}
-                                                                className="p-1.5 text-gray-400 hover:text-brand-cyan hover:bg-cyan-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                                                                title="Edit Task">
-                                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                                                        d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                                                </svg>
-                                                            </button>
-                                                            <button onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.taskId, task.taskName); }}
-                                                                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                                                                title="Delete Task">
-                                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                                </svg>
-                                                            </button>
+                                                    <div className="flex items-center gap-3 mt-1">
+                                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider 
+                                                            ${task.status === 'todo' ? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400' :
+                                                                task.status === 'in_progress' ? 'bg-brand-cyan/20 text-brand-cyan' :
+                                                                    'bg-brand-sage/20 text-brand-sage'}`}>
+                                                            {task.status === 'review' ? 'Review' :
+                                                                task.status === 'in_progress' ? 'In Progress' :
+                                                                    task.status === 'done' ? 'Done' : 'To Do'}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="flex items-center justify-between mt-2">
+                                                        <div className="flex items-center gap-3 flex-wrap">
+                                                            {task.dueDate && (
+                                                                <p className="text-[10px] text-gray-400 font-bold flex items-center gap-1">
+                                                                    <CalendarIcon className="w-3 h-3" />
+                                                                    {new Date(task.dueDate).toLocaleDateString()}
+                                                                </p>
+                                                            )}
                                                         </div>
-                                                    )}
-                                                </div>
-
-                                                <div className="flex items-center gap-3 mt-1">
-                                                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider 
-                                                        ${task.status === 'todo' ? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400' :
-                                                            task.status === 'in_progress' ? 'bg-brand-cyan/20 text-brand-cyan' :
-                                                                'bg-brand-sage/20 text-brand-sage'}`}>
-                                                        {task.status === 'review' ? 'Review' :
-                                                            task.status === 'in_progress' ? 'In Progress' :
-                                                                task.status === 'done' ? 'Done' : 'To Do'}
-                                                    </span>
-                                                </div>
-
-                                                <div className="flex items-center justify-between mt-2">
-                                                    <div className="flex items-center gap-3 flex-wrap">
-                                                        {task.dueDate && (
-                                                            <p className="text-[10px] text-gray-400 font-bold flex items-center gap-1">
-                                                                <CalendarIcon className="w-3 h-3" />
-                                                                {new Date(task.dueDate).toLocaleDateString()}
-                                                            </p>
-                                                        )}
+                                                        {/* Assignee avatars */}
+                                                        <div className="flex -space-x-2">
+                                                            {task.assignees && task.assignees.length > 0 ? (
+                                                                task.assignees.slice(0, 3).map((a: any) => (
+                                                                    <div key={a.workerId}
+                                                                        className="w-6 h-6 rounded-full ring-2 ring-white dark:ring-gray-800 bg-brand-peach flex items-center justify-center text-gray-900 font-bold text-[10px]"
+                                                                        title={a.workerName}>
+                                                                        {a.workerName.charAt(0).toUpperCase()}
+                                                                    </div>
+                                                                ))
+                                                            ) : (
+                                                                <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-gray-400 text-[10px]" title="Unassigned">?</div>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                    {/* Assignee avatars */}
-                                                    <div className="flex -space-x-2">
-                                                        {task.assignees && task.assignees.length > 0 ? (
-                                                            task.assignees.slice(0, 3).map((a: any) => (
-                                                                <div key={a.workerId}
-                                                                    className="w-6 h-6 rounded-full ring-2 ring-white dark:ring-gray-800 bg-brand-peach flex items-center justify-center text-gray-900 font-bold text-[10px]"
-                                                                    title={a.workerName}>
-                                                                    {a.workerName.charAt(0).toUpperCase()}
+
+                                                    {/* Blocked-by badge */}
+                                                    {(() => {
+                                                        if (task.status === 'done' || !task.dependencies || task.dependencies.length === 0) return null;
+                                                        const blockedBy = task.dependencies
+                                                            .map(depId => tasks.find(t => t.taskId === depId))
+                                                            .filter(t => t && t.status !== 'done');
+                                                        if (blockedBy.length > 0) {
+                                                            return (
+                                                                <div className="mt-2 bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400 text-[10px] font-bold px-2 py-1.5 rounded-lg border border-red-100 dark:border-red-900/30 flex items-center gap-1">
+                                                                    <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                                                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                                                    </svg>
+                                                                    <span className="truncate">Blocked by: {blockedBy.map(t => t?.taskName).join(', ')}</span>
                                                                 </div>
-                                                            ))
-                                                        ) : (
-                                                            <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-gray-400 text-[10px]" title="Unassigned">?</div>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                {/* Blocked-by badge (matching Kanban style) */}
-                                                {(() => {
-                                                    if (task.status === 'done' || !task.dependencies || task.dependencies.length === 0) return null;
-                                                    const blockedBy = task.dependencies
-                                                        .map(depId => tasks.find(t => t.taskId === depId))
-                                                        .filter(t => t && t.status !== 'done');
-                                                    if (blockedBy.length > 0) {
+                                                            );
+                                                        }
                                                         return (
-                                                            <div className="mt-2 bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400 text-[10px] font-bold px-2 py-1.5 rounded-lg border border-red-100 dark:border-red-900/30 flex items-center gap-1">
-                                                                <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                                                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                                                </svg>
-                                                                <span className="truncate">Blocked by: {blockedBy.map(t => t?.taskName).join(', ')}</span>
+                                                            <div className="mt-2 text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded-lg border border-amber-200 dark:border-amber-800 flex items-center gap-1">
+                                                                ↳ Depends on: {task.dependencies.map(id => getTaskNameById(id)).join(', ')}
                                                             </div>
                                                         );
-                                                    }
-                                                    // Show dependency info even if not blocked
-                                                    return (
-                                                        <div className="mt-2 text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded-lg border border-amber-200 dark:border-amber-800 flex items-center gap-1">
-                                                            ↳ Depends on: {task.dependencies.map(id => getTaskNameById(id)).join(', ')}
-                                                        </div>
-                                                    );
-                                                })()}
+                                                    })()}
+                                                </div>
                                             </div>
                                         </div>
+
+                                        {/* Drop slot after this card — PM only */}
+                                        {currentUserRole === 'project_manager' && (
+                                            <div
+                                                onDragOver={(e) => handleDragOverSlot(e, index + 1)}
+                                                onDragLeave={handleDragLeave}
+                                                onDrop={(e) => handleDropAtSlot(e, index + 1)}
+                                                className={`transition-all duration-200 rounded-xl ${dropTargetIndex === index + 1 && draggedTaskId !== null
+                                                    ? 'h-3 bg-cyan-400 dark:bg-cyan-500 my-1 shadow-md shadow-cyan-300/50'
+                                                    : 'h-1'
+                                                    }`}
+                                            />
+                                        )}
                                     </div>
                                 ))}
                             </div>
