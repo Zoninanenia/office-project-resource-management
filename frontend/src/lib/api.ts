@@ -1,3 +1,4 @@
+//const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002/api' || 'http://localhost:5000/api'; //Matoom
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 interface FetchOptions extends RequestInit {

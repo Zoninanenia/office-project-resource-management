@@ -148,12 +148,12 @@ export default function DashboardPage() {
                         <p className="text-gray-400 text-sm mb-6">Jump straight into action.</p>
 
                         <div className="space-y-3">
-                            <button className="w-full text-left px-4 py-3 bg-gray-700/50 hover:bg-gray-700 rounded-xl transition-colors flex items-center gap-3 group">
+                            <Link href="/dashboard/tasks" className="w-full text-left px-4 py-3 bg-gray-700/50 hover:bg-gray-700 rounded-xl transition-colors flex items-center gap-3 group block">
                                 <div className="p-2 bg-brand-cyan/20 text-brand-cyan rounded-lg group-hover:bg-brand-cyan group-hover:text-white transition-all">
                                     <ListIcon className="w-5 h-5" />
                                 </div>
-                                <span className="font-bold">My Tasks</span>
-                            </button>
+                            <span className="font-bold">My Tasks</span>
+                            </Link>
                             <button className="w-full text-left px-4 py-3 bg-gray-700/50 hover:bg-gray-700 rounded-xl transition-colors flex items-center gap-3 group">
                                 <div className="p-2 bg-brand-peach/20 text-brand-peach rounded-lg group-hover:bg-brand-peach group-hover:text-white transition-all">
                                     <UsersIcon className="w-5 h-5" />
