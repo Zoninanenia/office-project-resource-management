@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { Project } from '@/types';
+import { Project, Task } from '@/types';
 import Link from 'next/link';
 
 interface Member {
@@ -26,26 +26,27 @@ interface Team {
 }
 
 
-export function getProjectProgress(teams: Team[], projectId: number): number {
-  const filtered = teams.filter((t) => t.projectId === projectId);
-  if (!filtered.length) return 0;
-  
-  const allMembers = filtered.flatMap((t) => t.members);
-  const unique = [...new Map(allMembers.map((m) => [m.userId, m])).values()];
-  const total = unique.reduce((sum, m) => sum + m.totalTasks, 0);
-  const completed = unique.reduce((sum, m) => sum + m.completedTasks, 0);
-  return total === 0 ? 0 : Math.round((completed / total) * 100);
+// // Calculate Progress based on tasks
+export function getProjectProgress(tasks: Task[], projectId: number): number {
+  const projectTasks = tasks.filter(t => t.projectId === projectId);
+  if (projectTasks.length === 0) return 0;
+  const totalTasks = projectTasks.length;
+  const completedTasks = projectTasks.filter(t => t.status === 'done').length;
+  return Math.round((completedTasks / totalTasks) * 100);
 }
 
 export default function ProjectsPage() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [teams, setTeams] = useState<Team[]>([]);
+    const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('All Status');
     const [userRole, setUserRole] = useState<string | null>(null);
     const [userId, setUserId] = useState<string | null>(null);
+
+
     
     useEffect(() => {
         const fetchProjects = async () => {
@@ -72,6 +73,18 @@ export default function ProjectsPage() {
             }
         };
 
+        const fetchTasks = async () => {
+            try {
+                const data = await api.get<Task[]>('/tasks');
+                setTasks(data);
+            } catch (err) {
+                console.error('Failed to fetch tasks', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+
         const userStr = localStorage.getItem('user');
         if (userStr) {
             const user = JSON.parse(userStr);
@@ -80,7 +93,8 @@ export default function ProjectsPage() {
         }
 
         fetchProjects();
-        fetchTeams()
+        fetchTeams();
+        fetchTasks();
     }, []);
 
     // const filteredProjects = projects.filter(p => {
@@ -89,7 +103,7 @@ export default function ProjectsPage() {
     //     return matchesSearch && matchesStatus;
     // });
 
-    
+
     const getRoleBasedTeams = () => {
         return teams.filter(t => {
             return t.members?.some(member => String(member.userId).trim() === String(userId).trim());
@@ -189,10 +203,10 @@ export default function ProjectsPage() {
                                 <div className="flex justify-between items-end mb-2">
                                     {/* Mock Progress - would be real in full app */}
                                     <span className="text-xs font-bold text-gray-400 uppercase">Progress</span>
-                                    <span className="text-sm font-black text-cyan-600 dark:text-cyan-400">{getProjectProgress(teams, project.projectId)}%</span>
+                                    <span className="text-sm font-black text-cyan-600 dark:text-cyan-400">{getProjectProgress(tasks, project.projectId)}%</span>
                                 </div>
                                 <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-3 overflow-hidden mb-6">
-                                    <div className="bg-cyan-500 h-3 rounded-full relative overflow-hidden" style={{ width: `${getProjectProgress(teams, project.projectId)}%` }}>
+                                    <div className="bg-cyan-500 h-3 rounded-full relative overflow-hidden" style={{ width: `${getProjectProgress(tasks, project.projectId)}%` }}>
                                         <div className="absolute inset-0 bg-white/30 animate-[shimmer_2s_infinite]"></div>
                                     </div>
                                 </div>
