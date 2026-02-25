@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Task, User } from '@/types';
+import { useProject } from '../ProjectContext';
 
 // Extend Task type locally if needed for extra fields from join
 interface ExtendedTask extends Task {
@@ -56,6 +57,11 @@ export default function GlobalTasksPage() {
     const [isAssigneeDropdownOpen, setIsAssigneeDropdownOpen] = useState(false);
     const today = new Date().toISOString().split('T')[0];
 
+    // Dependency drag-and-drop state
+    const [depDropTarget, setDepDropTarget] = useState<number | null>(null);
+    const [depClearTarget, setDepClearTarget] = useState<string | null>(null);
+    const [savingDep, setSavingDep] = useState(false);
+
 
     useEffect(() => {
         const userStr = localStorage.getItem('user');
@@ -92,7 +98,7 @@ export default function GlobalTasksPage() {
         fetchTeams();
     }, []);
 
- 
+
 
     // Fetch resources for modal
     const handleOpenCreateModal = async (taskToEdit?: ExtendedTask) => {
@@ -236,12 +242,17 @@ export default function GlobalTasksPage() {
         });
     };
 
-    // Filter tasks by search
-    const filteredTasks = tasks.filter(t =>
-        t.taskName.toLowerCase().includes(search.toLowerCase()) ||
-        t.description?.toLowerCase().includes(search.toLowerCase()) ||
-        t.projectName?.toLowerCase().includes(search.toLowerCase())
-    );
+    const { selectedProjectId } = useProject();
+
+    // Filter tasks by search and project context
+    const filteredTasks = tasks.filter(t => {
+        if (selectedProjectId && t.projectId !== selectedProjectId) return false;
+        return (
+            t.taskName.toLowerCase().includes(search.toLowerCase()) ||
+            t.description?.toLowerCase().includes(search.toLowerCase()) ||
+            t.projectName?.toLowerCase().includes(search.toLowerCase())
+        );
+    });
 
     const todoTasks = filteredTasks.filter(t => t.status === 'todo');
     const inProgressTasks = filteredTasks.filter(t => t.status === 'in_progress');
@@ -250,6 +261,7 @@ export default function GlobalTasksPage() {
     // ฟังก์ชันเริ่มลากการ์ด
     const handleDragStart = (e: React.DragEvent, taskId: number) => {
         e.dataTransfer.setData('taskId', taskId.toString());
+        e.dataTransfer.effectAllowed = 'move';
     };
 
     // ฟังก์ชันอนุญาตให้วางทับได้ (จำเป็นต้องมี)
@@ -257,30 +269,34 @@ export default function GlobalTasksPage() {
         e.preventDefault();
     };
 
-    // ฟังก์ชันเมื่อปล่อยการ์ดลงคอลัมน์ใหม่
+    const handleDragEnd = () => {
+        setDepDropTarget(null);
+        setDepClearTarget(null);
+    };
+
+    // ฟังก์ชันเมื่อปล่อยการ์ดลงคอลัมน์ใหม่ (status change)
     const handleDrop = async (e: React.DragEvent, newStatus: string) => {
         e.preventDefault();
+        setDepClearTarget(null);
         const taskIdStr = e.dataTransfer.getData('taskId');
         if (!taskIdStr) return;
 
         const taskId = parseInt(taskIdStr, 10);
         const taskToUpdate = tasks.find(t => t.taskId === taskId);
 
-        // ถ้าหาไม่เจอ หรือวางในคอลัมน์สถานะเดิม ไม่ต้องทำอะไร
         if (!taskToUpdate || taskToUpdate.status === newStatus) return;
 
         const previousStatus = taskToUpdate.status;
 
-        // 1. Optimistic Update: อัปเดต UI ให้เปลี่ยนคอลัมน์ทันที
+        // Optimistic Update
         setTasks(prev => prev.map(t =>
             t.taskId === taskId ? { ...t, status: newStatus as any } : t
         ));
 
-        // 2. เรียก API เพื่ออัปเดตลง Database
         try {
             await api.put(`/tasks/${taskId}/status`, { status: newStatus });
         } catch (err: any) {
-            // 3. Rollback: ถ้า API พัง หรืออัปเดตไม่ได้ (เช่น ติด Dependencies) ให้ดึงกลับสถานะเดิม
+            // Rollback
             setTasks(prev => prev.map(t =>
                 t.taskId === taskId ? { ...t, status: previousStatus } : t
             ));
@@ -288,12 +304,103 @@ export default function GlobalTasksPage() {
         }
     };
 
+    // Drop a card ON another card -> set dependency
+    const handleDropOnCard = async (e: React.DragEvent, targetTaskId: number) => {
+        e.preventDefault();
+        e.stopPropagation(); // prevent column-level drop (status change)
+        setDepDropTarget(null);
+
+        const taskIdStr = e.dataTransfer.getData('taskId');
+        if (!taskIdStr) return;
+        const dragId = parseInt(taskIdStr, 10);
+        if (dragId === targetTaskId) return;
+
+        const draggedTask = tasks.find(t => t.taskId === dragId);
+        if (!draggedTask) return;
+
+        const newDeps = [targetTaskId];
+        const currentDeps = [...(draggedTask.dependencies || [])].sort();
+        const newDepsSorted = [...newDeps].sort();
+        if (JSON.stringify(currentDeps) === JSON.stringify(newDepsSorted)) return;
+
+        setSavingDep(true);
+        try {
+            await api.put(`/tasks/${dragId}`, {
+                taskName: draggedTask.taskName,
+                description: draggedTask.description,
+                dueDate: draggedTask.dueDate || '',
+                dependencies: newDeps,
+            });
+            setTasks(prev => prev.map(t =>
+                t.taskId === dragId ? { ...t, dependencies: newDeps } : t
+            ));
+        } catch (err: any) {
+            console.error('Failed to update dependencies', err);
+            alert(err.message || 'Failed to update dependencies');
+        } finally {
+            setSavingDep(false);
+        }
+    };
+
+    // Drop on the clear zone -> remove all dependencies
+    const handleDropOnClearZone = async (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDepClearTarget(null);
+
+        const taskIdStr = e.dataTransfer.getData('taskId');
+        if (!taskIdStr) return;
+        const dragId = parseInt(taskIdStr, 10);
+
+        const draggedTask = tasks.find(t => t.taskId === dragId);
+        if (!draggedTask) return;
+
+        const currentDeps = draggedTask.dependencies || [];
+        if (currentDeps.length === 0) return;
+
+        setSavingDep(true);
+        try {
+            await api.put(`/tasks/${dragId}`, {
+                taskName: draggedTask.taskName,
+                description: draggedTask.description,
+                dueDate: draggedTask.dueDate || '',
+                dependencies: [],
+            });
+            setTasks(prev => prev.map(t =>
+                t.taskId === dragId ? { ...t, dependencies: [] } : t
+            ));
+        } catch (err: any) {
+            console.error('Failed to clear dependencies', err);
+            alert(err.message || 'Failed to clear dependencies');
+        } finally {
+            setSavingDep(false);
+        }
+    };
+
+    const getTaskNameById = (id: number) => tasks.find(t => t.taskId === id)?.taskName || `Task #${id}`;
+
     const TaskCard = ({ task }: { task: ExtendedTask }) => (
 
         <div
             draggable
             onDragStart={(e) => handleDragStart(e, task.taskId)}
-            className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 mb-4 group relative overflow-hidden cursor-grab active:cursor-grabbing">
+            onDragEnd={handleDragEnd}
+            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move'; setDepDropTarget(task.taskId); }}
+            onDragLeave={() => setDepDropTarget(null)}
+            onDrop={(e) => handleDropOnCard(e, task.taskId)}
+            className={`bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border-2 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 mb-4 group relative overflow-hidden cursor-grab active:cursor-grabbing ${depDropTarget === task.taskId
+                ? 'border-cyan-400 dark:border-cyan-400 bg-cyan-50/50 dark:bg-cyan-900/10 shadow-lg shadow-cyan-200/50 dark:shadow-cyan-900/30 scale-[1.02]'
+                : 'border-gray-100 dark:border-gray-700'
+                }`}>
+            {/* Dependency drop overlay */}
+            {depDropTarget === task.taskId && (
+                <div className="absolute inset-0 flex items-center justify-center bg-cyan-400/10 dark:bg-cyan-400/5 z-20 rounded-2xl pointer-events-none">
+                    <span className="text-xs font-black text-cyan-500 bg-white dark:bg-gray-800 px-3 py-1.5 rounded-lg shadow-md">
+                        Drop to depend on "{task.taskName}"
+                    </span>
+                </div>
+            )}
+
             {/* Project Stripe */}
             <div
                 className="absolute left-0 top-0 bottom-0 w-1.5 bg-brand-teal group-hover:bg-brand-cyan transition-colors"></div>
@@ -306,19 +413,19 @@ export default function GlobalTasksPage() {
                     {(userRole === 'project_manager' || userRole === 'team_leader') && (
                         <div className="absolute top-3 right-3 flex gap-1 z-10 transition-opacity">
                             <button onClick={() => handleOpenCreateModal(task)}
-                                    className="p-1.5 text-gray-400 hover:text-brand-cyan hover:bg-cyan-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                                    title="Edit Task">
+                                className="p-1.5 text-gray-400 hover:text-brand-cyan hover:bg-cyan-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                title="Edit Task">
                                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                          d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                        d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                                 </svg>
                             </button>
                             <button onClick={() => handleDeleteTask(task.taskId, task.taskName)}
-                                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                                    title="Delete Task">
+                                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                title="Delete Task">
                                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
                             </button>
                         </div>
@@ -329,8 +436,8 @@ export default function GlobalTasksPage() {
                 <div className="flex justify-between items-center text-xs mt-3">
                     <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider 
                         ${task.status === 'todo' ? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400' :
-                        task.status === 'in_progress' ? 'bg-brand-cyan/20 text-brand-cyan' :
-                            'bg-brand-sage/20 text-brand-sage'}`}>
+                            task.status === 'in_progress' ? 'bg-brand-cyan/20 text-brand-cyan' :
+                                'bg-brand-sage/20 text-brand-sage'}`}>
                         {task.status === 'review' ? 'Review' :
                             task.status === 'in_progress' ? 'In Progress' :
                                 task.status === 'done' ? 'Done' : 'To Do'}
@@ -340,8 +447,8 @@ export default function GlobalTasksPage() {
                         {task.assignees && task.assignees.length > 0 ? (
                             task.assignees.slice(0, 3).map((a: any) => (
                                 <div key={a.workerId}
-                                     className="w-6 h-6 rounded-full ring-2 ring-white dark:ring-gray-800 bg-brand-peach flex items-center justify-center text-gray-900 font-bold text-[10px]"
-                                     title={a.workerName}>
+                                    className="w-6 h-6 rounded-full ring-2 ring-white dark:ring-gray-800 bg-brand-peach flex items-center justify-center text-gray-900 font-bold text-[10px]"
+                                    title={a.workerName}>
                                     {a.workerName.charAt(0).toUpperCase()}
                                 </div>
                             ))
@@ -373,16 +480,21 @@ export default function GlobalTasksPage() {
                             <div
                                 className="mt-2 bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400 text-[10px] font-bold px-2 py-1.5 rounded-lg border border-red-100 dark:border-red-900/30 flex items-center gap-1">
                                 <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24"
-                                     stroke="currentColor">
+                                    stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                 </svg>
                                 <span
                                     className="truncate">Blocked by: {blockedBy.map(t => t?.taskName).join(', ')}</span>
                             </div>
                         );
                     }
-                    return null;
+                    // All dependencies done - show amber badge
+                    return (
+                        <div className="mt-2 text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded-lg border border-amber-200 dark:border-amber-800 flex items-center gap-1">
+                            ↳ Depends on: {task.dependencies.map(id => getTaskNameById(id)).join(', ')}
+                        </div>
+                    );
                 })()}
             </div>
         </div>
@@ -399,7 +511,10 @@ export default function GlobalTasksPage() {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <div>
                     <h1 className="text-3xl font-black text-gray-800 dark:text-white tracking-tight">Active Tasks</h1>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">Manage and track your team's progress.</p>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">
+                        Manage and track your team's progress.
+                        {savingDep && <span className="ml-2 text-cyan-500 animate-pulse">Saving dependency...</span>}
+                    </p>
                 </div>
                 {(userRole === 'project_manager' || userRole === 'team_leader') && (
                     <button
@@ -445,7 +560,19 @@ export default function GlobalTasksPage() {
                     <div className="flex flex-col h-[850px] w-full max-w-md">
                         <div
                             className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700">
-                            {todoTasks.map(task => <TaskCard key={task.taskId} task={task}/>)}
+                            {/* Clear dependencies zone */}
+                            <div
+                                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDepClearTarget('todo'); }}
+                                onDragLeave={() => setDepClearTarget(null)}
+                                onDrop={handleDropOnClearZone}
+                                className={`rounded-xl border-2 border-dashed transition-all duration-200 text-center text-[10px] font-bold mb-2 ${depClearTarget === 'todo'
+                                        ? 'border-cyan-400 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-500 py-3'
+                                        : 'border-transparent py-0 h-0 overflow-hidden'
+                                    }`}
+                            >
+                                {depClearTarget === 'todo' && '↑ Drop here to clear dependencies'}
+                            </div>
+                            {todoTasks.map(task => <TaskCard key={task.taskId} task={task} />)}
                         </div>
                     </div>
 
@@ -467,7 +594,19 @@ export default function GlobalTasksPage() {
                     <div className="flex flex-col h-[850px] w-full max-w-md">
                         <div
                             className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-cyan-200 dark:scrollbar-thumb-cyan-900">
-                            {inProgressTasks.map(task => <TaskCard key={task.taskId} task={task}/>)}
+                            {/* Clear dependencies zone */}
+                            <div
+                                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDepClearTarget('in_progress'); }}
+                                onDragLeave={() => setDepClearTarget(null)}
+                                onDrop={handleDropOnClearZone}
+                                className={`rounded-xl border-2 border-dashed transition-all duration-200 text-center text-[10px] font-bold mb-2 ${depClearTarget === 'in_progress'
+                                        ? 'border-cyan-400 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-500 py-3'
+                                        : 'border-transparent py-0 h-0 overflow-hidden'
+                                    }`}
+                            >
+                                {depClearTarget === 'in_progress' && '↑ Drop here to clear dependencies'}
+                            </div>
+                            {inProgressTasks.map(task => <TaskCard key={task.taskId} task={task} />)}
                         </div>
                     </div>
 
@@ -489,7 +628,19 @@ export default function GlobalTasksPage() {
                     <div className="flex flex-col h-[850px] w-full max-w-md">
                         <div
                             className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-green-200 dark:scrollbar-thumb-green-900">
-                            {doneTasks.map(task => <TaskCard key={task.taskId} task={task}/>)}
+                            {/* Clear dependencies zone */}
+                            <div
+                                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDepClearTarget('done'); }}
+                                onDragLeave={() => setDepClearTarget(null)}
+                                onDrop={handleDropOnClearZone}
+                                className={`rounded-xl border-2 border-dashed transition-all duration-200 text-center text-[10px] font-bold mb-2 ${depClearTarget === 'done'
+                                        ? 'border-cyan-400 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-500 py-3'
+                                        : 'border-transparent py-0 h-0 overflow-hidden'
+                                    }`}
+                            >
+                                {depClearTarget === 'done' && '↑ Drop here to clear dependencies'}
+                            </div>
+                            {doneTasks.map(task => <TaskCard key={task.taskId} task={task} />)}
                         </div>
                     </div>
 

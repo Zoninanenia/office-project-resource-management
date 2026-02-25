@@ -152,7 +152,7 @@ export default function DashboardPage() {
                                 <div className="p-2 bg-brand-cyan/20 text-brand-cyan rounded-lg group-hover:bg-brand-cyan group-hover:text-white transition-all">
                                     <ListIcon className="w-5 h-5" />
                                 </div>
-                            <span className="font-bold">My Tasks</span>
+                                <span className="font-bold">My Tasks</span>
                             </Link>
                             <button className="w-full text-left px-4 py-3 bg-gray-700/50 hover:bg-gray-700 rounded-xl transition-colors flex items-center gap-3 group">
                                 <div className="p-2 bg-brand-peach/20 text-brand-peach rounded-lg group-hover:bg-brand-peach group-hover:text-white transition-all">
@@ -172,10 +172,10 @@ export default function DashboardPage() {
                     <div className="mt-8 pt-6 border-t border-gray-700">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full bg-linear-to-br from-brand-yellow to-orange-500 flex items-center justify-center font-bold text-black border-2 border-white/20">
-                                XP
+                                PM
                             </div>
                             <div>
-                                <p className="text-xs font-bold text-gray-400 uppercase">Level 5 Manager</p>
+                                <p className="text-xs font-bold text-gray-400 uppercase">Project Manager</p>
                                 <div className="w-32 h-2 bg-gray-700 rounded-full mt-1 overflow-hidden">
                                     <div className="w-3/4 h-full bg-brand-yellow rounded-full"></div>
                                 </div>

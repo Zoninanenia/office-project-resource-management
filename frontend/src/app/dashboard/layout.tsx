@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { ProjectProvider, useProject } from './ProjectContext';
 
 export default function DashboardLayout({
   children,
@@ -116,7 +117,7 @@ export default function DashboardLayout({
           {userRole === 'admin' ? (
             <TooltipNavItem href="/dashboard/admin/users" icon={<AdminIcon />} label="User Management" active={isActive('/dashboard/admin/users')} expanded={isSidebarExpanded} />
           ) : userRole === 'user' ? (
-              <>
+            <>
               <TooltipNavItem href="/dashboard" icon={<DashboardIcon />} label="Home" active={isActive('/dashboard')} expanded={isSidebarExpanded} />
               <TooltipNavItem href="/dashboard/tasks" icon={<ListIcon />} label="My Tasks" active={isActive('/dashboard/tasks')} expanded={isSidebarExpanded} />
               <TooltipNavItem href="/dashboard/issues" icon={<BugIcon />} label="Issues" active={isActive('/dashboard/issues')} expanded={isSidebarExpanded} />
@@ -180,46 +181,129 @@ export default function DashboardLayout({
       </aside>
 
       {/* Main Layout Content */}
-      <div className={`flex-1 ${isSidebarExpanded ? 'ml-64' : 'ml-20'} flex flex-col min-h-screen transition-all duration-300 ease-in-out`}>
+      <ProjectProvider>
+        <div className={`flex-1 ${isSidebarExpanded ? 'ml-64' : 'ml-20'} flex flex-col min-h-screen transition-all duration-300 ease-in-out`}>
 
-        {/* Top Context Bar */}
-        <header className="h-16 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 sticky top-0 z-20 px-8 flex items-center justify-between transition-colors duration-300">
-          <div className="flex items-center gap-4">
-            <h1 className="text-xl font-black text-gray-800 dark:text-gray-100 tracking-tight transition-colors">{getPageTitle(pathname)}</h1>
-            {/* Breadcrumb-ish indicator */}
-            <div className="hidden md:flex items-center text-xs font-bold text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full uppercase tracking-wider transition-colors">
-              {userRole?.replace('_', ' ') || 'Guest'} Mode
-            </div>
-          </div>
-
-          <div className="flex items-center gap-6">
-            {/* Search Bar */}
-            <div className="relative hidden md:block group">
-              <input
-                type="text"
-                placeholder="Search..."
-                className="pl-10 pr-4 py-2 w-64 bg-gray-100 dark:bg-gray-800 border-transparent rounded-xl text-sm font-medium focus:bg-white dark:focus:bg-gray-700 focus:ring-2 focus:ring-brand-cyan focus:outline-none transition-all dark:text-white"
-              />
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand-cyan transition-colors">
-                <SearchIcon className="w-4 h-4" />
+          {/* Top Context Bar */}
+          <header className="h-16 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 sticky top-0 z-20 px-8 flex items-center justify-between transition-colors duration-300">
+            <div className="flex items-center gap-4">
+              <h1 className="text-xl font-black text-gray-800 dark:text-gray-100 tracking-tight transition-colors">{getPageTitle(pathname)}</h1>
+              {/* Breadcrumb-ish indicator */}
+              <div className="hidden md:flex items-center text-xs font-bold text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full uppercase tracking-wider transition-colors">
+                {userRole?.replace('_', ' ') || 'Guest'} Mode
               </div>
             </div>
 
-            <button className="relative w-10 h-10 rounded-xl bg-gray-50 dark:bg-gray-800 hover:bg-white dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-brand-cyan dark:hover:text-brand-cyan transition-all">
-              <BellIcon className="w-5 h-5" />
-              <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-gray-900"></span>
-            </button>
-          </div>
-        </header>
+            <div className="flex items-center gap-6">
+              {/* Project Context Selector */}
+              {userRole !== 'admin' && <ProjectSelector />}
 
-        {/* Page Content */}
-        <main className="flex-1 p-6 md:p-8 lg:p-10 overflow-y-auto bg-linear-to-br from-blue-50/50 via-white to-cyan-50/30 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 transition-colors duration-300">
-          <div className="max-w-7xl mx-auto">
-            {children}
-          </div>
-        </main>
-      </div>
+              <button className="relative w-10 h-10 rounded-xl bg-gray-50 dark:bg-gray-800 hover:bg-white dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-brand-cyan dark:hover:text-brand-cyan transition-all">
+                <BellIcon className="w-5 h-5" />
+                <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-gray-900"></span>
+              </button>
+            </div>
+          </header>
+
+          {/* Page Content */}
+          <main className="flex-1 p-6 md:p-8 lg:p-10 overflow-y-auto bg-linear-to-br from-blue-50/50 via-white to-cyan-50/30 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 transition-colors duration-300">
+            <div className="max-w-7xl mx-auto">
+              {children}
+            </div>
+          </main>
+        </div>
+      </ProjectProvider>
     </div>
+  );
+}
+
+function ProjectSelector() {
+  const { selectedProjectId, setSelectedProjectId, projects } = useProject();
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedProject = projects.find(p => p.projectId === selectedProjectId);
+
+  return (
+    <div className="relative hidden md:block" ref={dropdownRef}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-bold transition-all ${selectedProjectId
+          ? 'bg-cyan-50 dark:bg-cyan-900/20 border-cyan-200 dark:border-cyan-800 text-cyan-700 dark:text-cyan-300'
+          : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+          }`}
+      >
+        <ProjectSelectorIcon className="w-4 h-4" />
+        <span className="max-w-[160px] truncate">{selectedProject ? selectedProject.title : 'All Projects'}</span>
+        <svg className={`w-3 h-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-full right-0 mt-2 w-72 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden z-50 animate-fade-in">
+          <div className="p-2">
+            {/* All Projects option */}
+            <button
+              onClick={() => { setSelectedProjectId(null); setIsOpen(false); }}
+              className={`w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${!selectedProjectId ? 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300' : 'hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200'
+                }`}
+            >
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${!selectedProjectId ? 'bg-cyan-100 dark:bg-cyan-900/40 text-cyan-600' : 'bg-gray-100 dark:bg-gray-700 text-gray-400'
+                }`}>✦</div>
+              <div>
+                <p className="text-sm font-bold">All Projects</p>
+                <p className="text-[10px] text-gray-400">Show everything</p>
+              </div>
+              {!selectedProjectId && (
+                <svg className="w-4 h-4 ml-auto text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+              )}
+            </button>
+
+            {projects.length > 0 && (
+              <div className="my-1 border-t border-gray-100 dark:border-gray-700"></div>
+            )}
+
+            {/* Project list */}
+            <div className="max-h-60 overflow-y-auto scrollbar-thin">
+              {projects.map(p => (
+                <button
+                  key={p.projectId}
+                  onClick={() => { setSelectedProjectId(p.projectId); setIsOpen(false); }}
+                  className={`w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 transition-colors ${selectedProjectId === p.projectId ? 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300' : 'hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200'
+                    }`}
+                >
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${selectedProjectId === p.projectId ? 'bg-cyan-100 dark:bg-cyan-900/40 text-cyan-600' : 'bg-gray-100 dark:bg-gray-700 text-gray-500'
+                    }`}>{p.title.charAt(0)}</div>
+                  <p className="text-sm font-bold truncate flex-1">{p.title}</p>
+                  {selectedProjectId === p.projectId && (
+                    <svg className="w-4 h-4 text-cyan-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProjectSelectorIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+    </svg>
   );
 }
 
