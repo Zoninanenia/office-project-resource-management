@@ -51,6 +51,8 @@ export interface Task {
     dueDate?: string;
     creatorId: number;
     projectId: number;
+    teamId?: number;
+    teamName?: string;
     dependencies?: number[];
     assignees?: {
         workerId: number;

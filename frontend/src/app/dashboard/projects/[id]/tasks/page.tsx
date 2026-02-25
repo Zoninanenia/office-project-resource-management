@@ -5,6 +5,12 @@ import { useParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { Task, User } from '@/types';
 
+interface TeamInfo {
+    teamId: number;
+    teamName: string;
+    projectId: number;
+}
+
 export default function ProjectTasksPage() {
     const params = useParams();
     const projectId = params.id as string;
@@ -19,6 +25,7 @@ export default function ProjectTasksPage() {
     const [isEditing, setIsEditing] = useState(false);
     const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
     const [potentialAssignees, setPotentialAssignees] = useState<User[]>([]);
+    const [projectTeams, setProjectTeams] = useState<TeamInfo[]>([]);
     const [newTask, setNewTask] = useState({
         taskName: '',
         description: '',
@@ -26,6 +33,7 @@ export default function ProjectTasksPage() {
         dueDate: '',
         assignedTo: [] as string[], // Changed to array
         dependencies: [] as number[],
+        teamId: '',
     });
 
     useEffect(() => {
@@ -48,6 +56,17 @@ export default function ProjectTasksPage() {
         };
 
         fetchTasks();
+
+        // Fetch teams for this project
+        const fetchTeams = async () => {
+            try {
+                const data = await api.get<TeamInfo[]>('/teams');
+                setProjectTeams(data.filter(t => t.projectId.toString() === projectId));
+            } catch (err) {
+                console.error('Failed to fetch teams', err);
+            }
+        };
+        fetchTeams();
     }, [projectId]);
 
     const handleOpenCreateModal = async (taskToEdit?: any) => {
@@ -71,6 +90,7 @@ export default function ProjectTasksPage() {
                 dueDate: isoDate,
                 assignedTo: taskToEdit.assignees ? taskToEdit.assignees.map((a: any) => a.workerId.toString()) : [],
                 dependencies: taskToEdit.dependencies || [],
+                teamId: taskToEdit.teamId ? taskToEdit.teamId.toString() : '',
             });
         } else {
             setIsEditing(false);
@@ -82,6 +102,7 @@ export default function ProjectTasksPage() {
                 dueDate: '',
                 assignedTo: [],
                 dependencies: [],
+                teamId: '',
             });
         }
         setShowCreateModal(true);
@@ -107,6 +128,7 @@ export default function ProjectTasksPage() {
                 dueDate: '',
                 assignedTo: [],
                 dependencies: [],
+                teamId: '',
             });
         } catch (err: any) {
             alert(err.message || 'Failed to process task');
@@ -204,6 +226,14 @@ export default function ProjectTasksPage() {
                                             )}
                                         </div>
 
+                                        {/* Team Badge */}
+                                        {(task as any).teamName && (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                                                {(task as any).teamName}
+                                            </span>
+                                        )}
+
                                         {/* Blocked Status */}
                                         {task.status !== 'done' && task.dependencies && task.dependencies.length > 0 && (
                                             <div className="flex items-center gap-1 mt-2 sm:mt-0">
@@ -294,6 +324,21 @@ export default function ProjectTasksPage() {
                                         ))
                                     )}
                                 </div>
+                            </div>
+
+                            {/* Team Assignment */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Assign to Team</label>
+                                <select
+                                    value={newTask.teamId}
+                                    onChange={e => setNewTask({ ...newTask, teamId: e.target.value })}
+                                    className="mt-1 w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                >
+                                    <option value="">No team (Unassigned)</option>
+                                    {projectTeams.map(t => (
+                                        <option key={t.teamId} value={t.teamId}>{t.teamName}</option>
+                                    ))}
+                                </select>
                             </div>
 
                             <div>

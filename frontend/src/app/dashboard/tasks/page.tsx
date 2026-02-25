@@ -38,6 +38,7 @@ export default function GlobalTasksPage() {
     const [userRole, setUserRole] = useState<string | null>(null);
     const [teams, setTeams] = useState<Team[]>([]);
     const [userId, setUserId] = useState<string | null>(null);
+    const [filterTeamId, setFilterTeamId] = useState<string>('');
 
     // Create/Edit Task Modal State
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -53,6 +54,7 @@ export default function GlobalTasksPage() {
         dueDate: '',
         assignedTo: [] as string[],
         dependencies: [] as number[],
+        teamId: '',
     });
     const [isAssigneeDropdownOpen, setIsAssigneeDropdownOpen] = useState(false);
     const today = new Date().toISOString().split('T')[0];
@@ -124,6 +126,7 @@ export default function GlobalTasksPage() {
                     dueDate: isoDate,
                     assignedTo: taskToEdit.assignees ? taskToEdit.assignees.map((a: any) => a.workerId.toString()) : [],
                     dependencies: taskToEdit.dependencies || [],
+                    teamId: taskToEdit.teamId ? taskToEdit.teamId.toString() : '',
                 });
             } else {
                 setIsEditing(false);
@@ -136,6 +139,7 @@ export default function GlobalTasksPage() {
                     dueDate: '',
                     assignedTo: [],
                     dependencies: [],
+                    teamId: '',
                 });
             }
 
@@ -213,6 +217,7 @@ export default function GlobalTasksPage() {
                 dueDate: '',
                 assignedTo: [],
                 dependencies: [],
+                teamId: '',
             });
         } catch (err: any) {
             alert(err.message || 'Failed to process task');
@@ -244,14 +249,14 @@ export default function GlobalTasksPage() {
 
     const { selectedProjectId } = useProject();
 
-    // Filter tasks by search and project context
+    // Filter tasks by search, project context, and team
     const filteredTasks = tasks.filter(t => {
         if (selectedProjectId && t.projectId !== selectedProjectId) return false;
-        return (
-            t.taskName.toLowerCase().includes(search.toLowerCase()) ||
+        const matchSearch = t.taskName.toLowerCase().includes(search.toLowerCase()) ||
             t.description?.toLowerCase().includes(search.toLowerCase()) ||
-            t.projectName?.toLowerCase().includes(search.toLowerCase())
-        );
+            t.projectName?.toLowerCase().includes(search.toLowerCase());
+        const matchTeam = filterTeamId === '' || (t.teamId && t.teamId.toString() === filterTeamId);
+        return matchSearch && matchTeam;
     });
 
     const todoTasks = filteredTasks.filter(t => t.status === 'todo');
@@ -431,7 +436,17 @@ export default function GlobalTasksPage() {
                         </div>
                     )}
                 </div>
-                <p className="text-xs font-bold text-brand-teal dark:text-brand-cyan mb-3 uppercase tracking-wider">{task.projectName}</p>
+                <p className="text-xs font-bold text-brand-teal dark:text-brand-cyan mb-1 uppercase tracking-wider">{task.projectName}</p>
+
+                {/* Team Badge */}
+                {task.teamName && (
+                    <div className="mb-3">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                            {task.teamName}
+                        </span>
+                    </div>
+                )}
 
                 <div className="flex justify-between items-center text-xs mt-3">
                     <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider 
@@ -540,6 +555,17 @@ export default function GlobalTasksPage() {
                         <SearchIcon className="w-5 h-5" />
                     </div>
                 </div>
+                {/* Team Filter */}
+                <select
+                    value={filterTeamId}
+                    onChange={e => setFilterTeamId(e.target.value)}
+                    className="px-4 py-2.5 bg-white dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 rounded-xl font-bold text-sm focus:border-brand-cyan focus:outline-none transition-all dark:text-white min-w-[160px]"
+                >
+                    <option value="">All Teams</option>
+                    {teams.map(t => (
+                        <option key={t.teamId} value={t.teamId}>{t.teamName}</option>
+                    ))}
+                </select>
             </div>
 
             {/* Kanban Board */}
@@ -566,23 +592,24 @@ export default function GlobalTasksPage() {
                                 onDragLeave={() => setDepClearTarget(null)}
                                 onDrop={handleDropOnClearZone}
                                 className={`rounded-xl border-2 border-dashed transition-all duration-200 text-center text-[10px] font-bold mb-2 ${depClearTarget === 'todo'
-                                        ? 'border-cyan-400 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-500 py-3'
-                                        : 'border-transparent py-0 h-0 overflow-hidden'
+                                    ? 'border-cyan-400 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-500 py-3'
+                                    : 'border-transparent py-0 h-0 overflow-hidden'
                                     }`}
                             >
                                 {depClearTarget === 'todo' && '↑ Drop here to clear dependencies'}
                             </div>
                             {todoTasks.map(task => <TaskCard key={task.taskId} task={task} />)}
-                        </div>
-                    </div>
+                        </div >
+                    </div >
 
-                </div>
+                </div >
 
                 {/* In Progress Column */}
-                <div
+                < div
                     className="flex flex-col h-full bg-cyan-50/30 dark:bg-cyan-900/10 rounded-3xl p-4 border border-cyan-100 dark:border-cyan-900/30"
                     onDragOver={handleDragOver}
-                    onDrop={(e) => handleDrop(e, 'in_progress')}
+                    onDrop={(e) => handleDrop(e, 'in_progress')
+                    }
                 >
                     <div className="flex items-center justify-between mb-4 px-2">
                         <h2 className="text-lg font-black text-gray-700 dark:text-gray-200 flex items-center gap-2">
@@ -600,20 +627,20 @@ export default function GlobalTasksPage() {
                                 onDragLeave={() => setDepClearTarget(null)}
                                 onDrop={handleDropOnClearZone}
                                 className={`rounded-xl border-2 border-dashed transition-all duration-200 text-center text-[10px] font-bold mb-2 ${depClearTarget === 'in_progress'
-                                        ? 'border-cyan-400 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-500 py-3'
-                                        : 'border-transparent py-0 h-0 overflow-hidden'
+                                    ? 'border-cyan-400 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-500 py-3'
+                                    : 'border-transparent py-0 h-0 overflow-hidden'
                                     }`}
                             >
                                 {depClearTarget === 'in_progress' && '↑ Drop here to clear dependencies'}
                             </div>
                             {inProgressTasks.map(task => <TaskCard key={task.taskId} task={task} />)}
-                        </div>
-                    </div>
+                        </div >
+                    </div >
 
-                </div>
+                </div >
 
                 {/* Done Column */}
-                <div
+                < div
                     className="flex flex-col h-full bg-green-50/30 dark:bg-green-900/10 rounded-3xl p-4 border border-green-100 dark:border-green-900/30"
                     onDragOver={handleDragOver}
                     onDrop={(e) => handleDrop(e, 'done')}
@@ -634,197 +661,214 @@ export default function GlobalTasksPage() {
                                 onDragLeave={() => setDepClearTarget(null)}
                                 onDrop={handleDropOnClearZone}
                                 className={`rounded-xl border-2 border-dashed transition-all duration-200 text-center text-[10px] font-bold mb-2 ${depClearTarget === 'done'
-                                        ? 'border-cyan-400 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-500 py-3'
-                                        : 'border-transparent py-0 h-0 overflow-hidden'
+                                    ? 'border-cyan-400 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-500 py-3'
+                                    : 'border-transparent py-0 h-0 overflow-hidden'
                                     }`}
                             >
                                 {depClearTarget === 'done' && '↑ Drop here to clear dependencies'}
                             </div>
                             {doneTasks.map(task => <TaskCard key={task.taskId} task={task} />)}
-                        </div>
-                    </div>
+                        </div >
+                    </div >
 
-                </div>
-            </div>
+                </div >
+            </div >
 
             {/* Create Task Modal */}
-            {showCreateModal && (
-                <div
-                    className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+            {
+                showCreateModal && (
                     <div
-                        className="bg-white dark:bg-gray-800 rounded-3xl p-8 w-full max-w-lg shadow-2xl scale-100 transition-all">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-2xl font-black text-gray-900 dark:text-white">{isEditing ? 'Edit Task Info' : 'Create New Task'}</h2>
-                            <button onClick={() => setShowCreateModal(false)} className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 hover:text-red-500 transition-colors">&times;</button>
-                        </div>
-
-                        <form onSubmit={handleCreateTask} className="space-y-5">
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Project</label>
-                                <select
-                                    value={newTask.projectId}
-                                    onChange={e => setNewTask({ ...newTask, projectId: e.target.value })}
-                                    className="w-full p-3 bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-brand-cyan rounded-xl font-bold outline-none transition-all dark:text-white"
-                                    required
-                                    disabled={isEditing} // usually changing project mid-flight is tricky, disabling for simpler UX
-                                >
-                                    <option value="">Select a project...</option>
-                                    {/* {projects.map(p => ( */}
-                                    {filteredProjectss.map(p => (
-                                        <option key={p.projectId} value={p.projectId}>{p.title}</option>
-                                    ))}
-                                </select>
+                        className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+                        <div
+                            className="bg-white dark:bg-gray-800 rounded-3xl p-8 w-full max-w-lg shadow-2xl scale-100 transition-all">
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-2xl font-black text-gray-900 dark:text-white">{isEditing ? 'Edit Task Info' : 'Create New Task'}</h2>
+                                <button onClick={() => setShowCreateModal(false)} className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 hover:text-red-500 transition-colors">&times;</button>
                             </div>
 
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Task Name</label>
-                                <input
-                                    type="text"
-                                    value={newTask.taskName}
-                                    onChange={e => setNewTask({ ...newTask, taskName: e.target.value })}
-                                    className="w-full p-3 bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-brand-cyan rounded-xl font-bold outline-none transition-all dark:text-white"
-                                    placeholder="e.g. Design Homepage"
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Description</label>
-                                <textarea
-                                    value={newTask.description}
-                                    onChange={e => setNewTask({ ...newTask, description: e.target.value })}
-                                    className="w-full p-3 bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-brand-cyan rounded-xl font-medium outline-none transition-all dark:text-white"
-                                    rows={3}
-                                    placeholder="Add details..."
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
+                            <form onSubmit={handleCreateTask} className="space-y-5">
                                 <div>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Due Date</label>
-                                    <input
-                                        type="date"
-                                        min={today}
-                                        value={newTask.dueDate}
-                                        onChange={e => setNewTask({ ...newTask, dueDate: e.target.value })}
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Project</label>
+                                    <select
+                                        value={newTask.projectId}
+                                        onChange={e => setNewTask({ ...newTask, projectId: e.target.value })}
                                         className="w-full p-3 bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-brand-cyan rounded-xl font-bold outline-none transition-all dark:text-white"
+                                        required
+                                        disabled={isEditing} // usually changing project mid-flight is tricky, disabling for simpler UX
+                                    >
+                                        <option value="">Select a project...</option>
+                                        {/* {projects.map(p => ( */}
+                                        {filteredProjectss.map(p => (
+                                            <option key={p.projectId} value={p.projectId}>{p.title}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Task Name</label>
+                                    <input
+                                        type="text"
+                                        value={newTask.taskName}
+                                        onChange={e => setNewTask({ ...newTask, taskName: e.target.value })}
+                                        className="w-full p-3 bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-brand-cyan rounded-xl font-bold outline-none transition-all dark:text-white"
+                                        placeholder="e.g. Design Homepage"
+                                        required
                                     />
                                 </div>
-                                <div className="relative">
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Assign to (Worker)</label>
-                                    <div
-                                        className="w-full p-3 bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-brand-cyan rounded-xl min-h-[50px] cursor-pointer flex flex-wrap gap-2 items-center transition-all"
-                                        onClick={() => setIsAssigneeDropdownOpen(!isAssigneeDropdownOpen)}
-                                    >
-                                        {newTask.assignedTo.length > 0 ? (
-                                            newTask.assignedTo.map(id => {
-                                                const user = potentialAssignees.find(u => u.userId.toString() === id);
-                                                if (!user) return null;
-                                                return (
-                                                    <div key={id} className="bg-white dark:bg-gray-600 border border-gray-200 dark:border-gray-500 rounded-lg px-2 py-1 flex items-center gap-1.5 shadow-xs" onClick={(e) => { e.stopPropagation(); toggleAssignee(id); }}>
-                                                        <div className="w-4 h-4 rounded-full bg-brand-cyan text-white flex items-center justify-center text-[8px] font-bold">
-                                                            {user.firstName?.charAt(0) || user.username.charAt(0)}
-                                                        </div>
-                                                        <span className="text-xs font-bold text-gray-700 dark:text-gray-200">{user.firstName || user.username}</span>
-                                                        <span className="text-gray-400 hover:text-red-500 text-xs ml-1">×</span>
-                                                    </div>
-                                                );
-                                            })
-                                        ) : (
-                                            <span className="text-sm text-gray-400 font-medium">Select workers...</span>
-                                        )}
-                                        <div className="ml-auto text-gray-400 transform transition-transform">
-                                            <svg className={`w-4 h-4 ${isAssigneeDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                                        </div>
-                                    </div>
 
-                                    {/* Dropdown List */}
-                                    {isAssigneeDropdownOpen && (
-                                        <div className="absolute top-full left-0 mt-2 w-full bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 max-h-60 overflow-y-auto z-20 p-2 space-y-1">
-                                            {potentialAssignees.length > 0 ? (
-                                                potentialAssignees.map(user => (
-                                                    <div
-                                                        key={user.userId}
-                                                        onClick={() => toggleAssignee(user.userId.toString())}
-                                                        className={`p-2 rounded-lg flex items-center gap-3 cursor-pointer transition-colors ${newTask.assignedTo.includes(user.userId.toString())
-                                                            ? 'bg-cyan-50 dark:bg-cyan-900/20'
-                                                            : 'hover:bg-gray-50 dark:hover:bg-gray-700'
-                                                            }`}
-                                                    >
-                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${newTask.assignedTo.includes(user.userId.toString())
-                                                            ? 'bg-brand-cyan text-white'
-                                                            : 'bg-gray-100 dark:bg-gray-600 text-gray-500'
-                                                            }`}>
-                                                            {user.firstName?.charAt(0) || user.username.charAt(0)}
-                                                        </div>
-                                                        <div className="flex-1">
-                                                            <p className={`text-sm font-bold ${newTask.assignedTo.includes(user.userId.toString()) ? 'text-brand-cyan' : 'text-gray-700 dark:text-gray-200'}`}>
-                                                                {user.firstName || user.username} {user.lastName}
-                                                            </p>
-                                                            <p className="text-[10px] text-gray-400 capitalize">{user.role}</p>
-                                                        </div>
-                                                        {newTask.assignedTo.includes(user.userId.toString()) && (
-                                                            <div className="text-brand-cyan">
-                                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                ))
-                                            ) : (
-                                                <div className="p-4 text-center text-gray-400 text-sm">No workers found</div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Dependencies Selector */}
-                            {newTask.projectId && (
                                 <div>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Must be finished after (Dependencies)</label>
-                                    <div className="max-h-40 overflow-y-auto border-2 border-transparent bg-gray-50 dark:bg-gray-700 rounded-xl p-2 focus-within:border-brand-cyan transition-all">
-                                        {(() => {
-                                            const projectTasks = tasks.filter(t => t.projectId.toString() === newTask.projectId);
-                                            if (projectTasks.length === 0) {
-                                                return <p className="text-xs text-gray-400 font-medium p-2">No existing tasks in this project.</p>;
-                                            }
-                                            return projectTasks.map(t => (
-                                                <div key={`dep-${t.taskId}`} className="flex items-center space-x-2 py-1.5 px-2 hover:bg-white dark:hover:bg-gray-600 rounded-lg transition-colors cursor-pointer">
-                                                    <input
-                                                        type="checkbox"
-                                                        id={`global-dep-${t.taskId}`}
-                                                        checked={newTask.dependencies.includes(t.taskId)}
-                                                        onChange={(e) => {
-                                                            if (e.target.checked) {
-                                                                setNewTask(prev => ({ ...prev, dependencies: [...prev.dependencies, t.taskId] }));
-                                                            } else {
-                                                                setNewTask(prev => ({ ...prev, dependencies: prev.dependencies.filter(id => id !== t.taskId) }));
-                                                            }
-                                                        }}
-                                                        className="rounded border-gray-300 text-brand-cyan shadow-sm focus:border-brand-cyan focus:ring focus:ring-brand-cyan/20"
-                                                    />
-                                                    <label htmlFor={`global-dep-${t.taskId}`} className="text-sm font-bold text-gray-700 dark:text-gray-200 cursor-pointer select-none flex-1 truncate">
-                                                        {t.taskName} <span className="text-[10px] text-gray-400 font-medium ml-1">({t.status.replace('_', ' ')})</span>
-                                                    </label>
-                                                </div>
-                                            ));
-                                        })()}
-                                    </div>
-                                    <p className="text-[10px] text-gray-400 mt-1 font-medium">Select tasks that must be completed before this one can begin.</p>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Description</label>
+                                    <textarea
+                                        value={newTask.description}
+                                        onChange={e => setNewTask({ ...newTask, description: e.target.value })}
+                                        className="w-full p-3 bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-brand-cyan rounded-xl font-medium outline-none transition-all dark:text-white"
+                                        rows={3}
+                                        placeholder="Add details..."
+                                    />
                                 </div>
-                            )}
 
-                            <button
-                                type="submit"
-                                className="w-full py-4 mt-2 bg-linear-to-r from-cyan-500 to-blue-600 hover:shadow-cyan-500/30 text-white font-black rounded-xl shadow-lg transform hover:-translate-y-1 transition-all"
-                            >
-                                {isEditing ? 'Save Changes' : 'Create Task'}
-                            </button>
-                        </form>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Due Date</label>
+                                        <input
+                                            type="date"
+                                            min={today}
+                                            value={newTask.dueDate}
+                                            onChange={e => setNewTask({ ...newTask, dueDate: e.target.value })}
+                                            className="w-full p-3 bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-brand-cyan rounded-xl font-bold outline-none transition-all dark:text-white"
+                                        />
+                                    </div>
+                                    <div className="relative">
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Assign to (Worker)</label>
+                                        <div
+                                            className="w-full p-3 bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-brand-cyan rounded-xl min-h-[50px] cursor-pointer flex flex-wrap gap-2 items-center transition-all"
+                                            onClick={() => setIsAssigneeDropdownOpen(!isAssigneeDropdownOpen)}
+                                        >
+                                            {newTask.assignedTo.length > 0 ? (
+                                                newTask.assignedTo.map(id => {
+                                                    const user = potentialAssignees.find(u => u.userId.toString() === id);
+                                                    if (!user) return null;
+                                                    return (
+                                                        <div key={id} className="bg-white dark:bg-gray-600 border border-gray-200 dark:border-gray-500 rounded-lg px-2 py-1 flex items-center gap-1.5 shadow-xs" onClick={(e) => { e.stopPropagation(); toggleAssignee(id); }}>
+                                                            <div className="w-4 h-4 rounded-full bg-brand-cyan text-white flex items-center justify-center text-[8px] font-bold">
+                                                                {user.firstName?.charAt(0) || user.username.charAt(0)}
+                                                            </div>
+                                                            <span className="text-xs font-bold text-gray-700 dark:text-gray-200">{user.firstName || user.username}</span>
+                                                            <span className="text-gray-400 hover:text-red-500 text-xs ml-1">×</span>
+                                                        </div>
+                                                    );
+                                                })
+                                            ) : (
+                                                <span className="text-sm text-gray-400 font-medium">Select workers...</span>
+                                            )}
+                                            <div className="ml-auto text-gray-400 transform transition-transform">
+                                                <svg className={`w-4 h-4 ${isAssigneeDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                                            </div>
+                                        </div>
+
+                                        {/* Dropdown List */}
+                                        {isAssigneeDropdownOpen && (
+                                            <div className="absolute top-full left-0 mt-2 w-full bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 max-h-60 overflow-y-auto z-20 p-2 space-y-1">
+                                                {potentialAssignees.length > 0 ? (
+                                                    potentialAssignees.map(user => (
+                                                        <div
+                                                            key={user.userId}
+                                                            onClick={() => toggleAssignee(user.userId.toString())}
+                                                            className={`p-2 rounded-lg flex items-center gap-3 cursor-pointer transition-colors ${newTask.assignedTo.includes(user.userId.toString())
+                                                                ? 'bg-cyan-50 dark:bg-cyan-900/20'
+                                                                : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                                                                }`}
+                                                        >
+                                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${newTask.assignedTo.includes(user.userId.toString())
+                                                                ? 'bg-brand-cyan text-white'
+                                                                : 'bg-gray-100 dark:bg-gray-600 text-gray-500'
+                                                                }`}>
+                                                                {user.firstName?.charAt(0) || user.username.charAt(0)}
+                                                            </div>
+                                                            <div className="flex-1">
+                                                                <p className={`text-sm font-bold ${newTask.assignedTo.includes(user.userId.toString()) ? 'text-brand-cyan' : 'text-gray-700 dark:text-gray-200'}`}>
+                                                                    {user.firstName || user.username} {user.lastName}
+                                                                </p>
+                                                                <p className="text-[10px] text-gray-400 capitalize">{user.role}</p>
+                                                            </div>
+                                                            {newTask.assignedTo.includes(user.userId.toString()) && (
+                                                                <div className="text-brand-cyan">
+                                                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <div className="p-4 text-center text-gray-400 text-sm">No workers found</div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Team Assignment */}
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Assign to Team</label>
+                                        <select
+                                            value={newTask.teamId}
+                                            onChange={e => setNewTask({ ...newTask, teamId: e.target.value })}
+                                            className="w-full p-3 bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-brand-cyan rounded-xl font-bold outline-none transition-all dark:text-white"
+                                        >
+                                            <option value="">No team (Unassigned)</option>
+                                            {teams.filter(t => !newTask.projectId || t.projectId.toString() === newTask.projectId).map(t => (
+                                                <option key={t.teamId} value={t.teamId}>{t.teamName}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* Dependencies Selector */}
+                                {newTask.projectId && (
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Must be finished after (Dependencies)</label>
+                                        <div className="max-h-40 overflow-y-auto border-2 border-transparent bg-gray-50 dark:bg-gray-700 rounded-xl p-2 focus-within:border-brand-cyan transition-all">
+                                            {(() => {
+                                                const projectTasks = tasks.filter(t => t.projectId.toString() === newTask.projectId);
+                                                if (projectTasks.length === 0) {
+                                                    return <p className="text-xs text-gray-400 font-medium p-2">No existing tasks in this project.</p>;
+                                                }
+                                                return projectTasks.map(t => (
+                                                    <div key={`dep-${t.taskId}`} className="flex items-center space-x-2 py-1.5 px-2 hover:bg-white dark:hover:bg-gray-600 rounded-lg transition-colors cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            id={`global-dep-${t.taskId}`}
+                                                            checked={newTask.dependencies.includes(t.taskId)}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) {
+                                                                    setNewTask(prev => ({ ...prev, dependencies: [...prev.dependencies, t.taskId] }));
+                                                                } else {
+                                                                    setNewTask(prev => ({ ...prev, dependencies: prev.dependencies.filter(id => id !== t.taskId) }));
+                                                                }
+                                                            }}
+                                                            className="rounded border-gray-300 text-brand-cyan shadow-sm focus:border-brand-cyan focus:ring focus:ring-brand-cyan/20"
+                                                        />
+                                                        <label htmlFor={`global-dep-${t.taskId}`} className="text-sm font-bold text-gray-700 dark:text-gray-200 cursor-pointer select-none flex-1 truncate">
+                                                            {t.taskName} <span className="text-[10px] text-gray-400 font-medium ml-1">({t.status.replace('_', ' ')})</span>
+                                                        </label>
+                                                    </div>
+                                                ));
+                                            })()}
+                                        </div>
+                                        <p className="text-[10px] text-gray-400 mt-1 font-medium">Select tasks that must be completed before this one can begin.</p>
+                                    </div>
+                                )}
+
+                                <button
+                                    type="submit"
+                                    className="w-full py-4 mt-2 bg-linear-to-r from-cyan-500 to-blue-600 hover:shadow-cyan-500/30 text-white font-black rounded-xl shadow-lg transform hover:-translate-y-1 transition-all"
+                                >
+                                    {isEditing ? 'Save Changes' : 'Create Task'}
+                                </button>
+                            </form>
+                        </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 }
 
