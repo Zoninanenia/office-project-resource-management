@@ -8,8 +8,10 @@ exports.getAllTasks = async (req, res) => {
     try {
         let query = `
       SELECT t.taskId as "taskId", t.taskName as "taskName", t.description, t.status, t.createdDate as "createdDate", t.dueDate as "dueDate", t.projectId as "projectId",
+             t.teamId as "teamId",
              p.title as "projectName",
              u.username as "creatorName",
+             tm.teamName as "teamName",
              COALESCE(
                  json_agg(
                      json_build_object('workerId', w.userId, 'workerName', w.username)
@@ -25,19 +27,20 @@ exports.getAllTasks = async (req, res) => {
       FROM Tasks t
       LEFT JOIN Projects p ON t.projectId = p.projectId
       LEFT JOIN Users u ON t.creatorId = u.userId
+      LEFT JOIN Teams tm ON t.teamId = tm.teamId
       LEFT JOIN TasksToWorkers ttw ON t.taskId = ttw.taskId
       LEFT JOIN Users w ON ttw.workerId = w.userId
     `;
 
         const params = [];
 
-        // If not PM, filter by assignment or creation
+        // If not PM, filter by assignment, creation, or team membership
         if (userRole !== 'project_manager') {
-            query += ` WHERE t.creatorId = $1 OR EXISTS (SELECT 1 FROM TasksToWorkers ttw2 WHERE ttw2.taskId = t.taskId AND ttw2.workerId = $1)`;
+            query += ` WHERE t.creatorId = $1 OR EXISTS (SELECT 1 FROM TasksToWorkers ttw2 WHERE ttw2.taskId = t.taskId AND ttw2.workerId = $1) OR EXISTS (SELECT 1 FROM TeamMembers tmem WHERE tmem.userId = $1 AND tmem.teamId = t.teamId)`;
             params.push(userId);
         }
 
-        query += ` GROUP BY t.taskId, p.title, u.username ORDER BY t.dueDate ASC`;
+        query += ` GROUP BY t.taskId, p.title, u.username, tm.teamName ORDER BY t.dueDate ASC`;
 
         const result = await pool.query(query, params);
         res.json(result.rows);
@@ -54,7 +57,9 @@ exports.getTasksByProject = async (req, res) => {
     try {
         const result = await pool.query(`
       SELECT t.taskId as "taskId", t.taskName as "taskName", t.description, t.status, t.createdDate as "createdDate", t.dueDate as "dueDate", t.projectId as "projectId",
+             t.teamId as "teamId",
              u.username as "creatorName",
+             tm.teamName as "teamName",
              COALESCE(
                  json_agg(
                      json_build_object('workerId', w.userId, 'workerName', w.username)
@@ -69,10 +74,11 @@ exports.getTasksByProject = async (req, res) => {
              ) as "dependencies"
       FROM Tasks t
       LEFT JOIN Users u ON t.creatorId = u.userId
+      LEFT JOIN Teams tm ON t.teamId = tm.teamId
       LEFT JOIN TasksToWorkers ttw ON t.taskId = ttw.taskId
       LEFT JOIN Users w ON ttw.workerId = w.userId
       WHERE t.projectId = $1
-      GROUP BY t.taskId, u.username
+      GROUP BY t.taskId, u.username, tm.teamName
       ORDER BY t.createdDate DESC
     `, [projectId]);
 
@@ -86,11 +92,12 @@ exports.getTasksByProject = async (req, res) => {
 // Create a new task (PM/Team Leader)
 exports.createTask = async (req, res) => {
     const { projectId } = req.params;
-    const { taskName, description, status, dueDate, assignedTo, dependencies } = req.body;
+    const { taskName, description, status, dueDate, assignedTo, dependencies, teamId } = req.body;
     const creatorId = req.user.userId; // From auth middleware
 
     // Handle empty date string
     const validDueDate = dueDate === '' ? null : dueDate;
+    const validTeamId = teamId === '' || teamId === undefined ? null : teamId;
 
     const client = await pool.connect();
 
@@ -99,8 +106,8 @@ exports.createTask = async (req, res) => {
 
         // Create Task
         const newTask = await client.query(
-            'INSERT INTO Tasks (taskName, description, status, dueDate, creatorId, projectId) VALUES ($1, $2, $3, $4, $5, $6) RETURNING taskId as "taskId", taskName as "taskName", description, status, dueDate as "dueDate", projectId as "projectId"',
-            [taskName, description, status || 'todo', validDueDate, creatorId, projectId]
+            'INSERT INTO Tasks (taskName, description, status, dueDate, creatorId, projectId, teamId) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING taskId as "taskId", taskName as "taskName", description, status, dueDate as "dueDate", projectId as "projectId", teamId as "teamId"',
+            [taskName, description, status || 'todo', validDueDate, creatorId, projectId, validTeamId]
         );
 
         const taskId = newTask.rows[0].taskId;
@@ -191,9 +198,10 @@ exports.deleteTask = async (req, res) => {
 // Update Task Details (PM/Team Leader)
 exports.updateTask = async (req, res) => {
     const { taskId } = req.params;
-    const { taskName, description, dueDate, assignedTo, dependencies } = req.body;
+    const { taskName, description, dueDate, assignedTo, dependencies, teamId } = req.body;
 
     const validDueDate = dueDate === '' ? null : dueDate;
+    const validTeamId = teamId === '' || teamId === undefined ? null : teamId;
     const client = await pool.connect();
 
     try {
@@ -201,8 +209,8 @@ exports.updateTask = async (req, res) => {
 
         // Update core task info
         const result = await client.query(
-            'UPDATE Tasks SET taskName = $1, description = $2, dueDate = $3 WHERE taskId = $4 RETURNING *',
-            [taskName, description, validDueDate, taskId]
+            'UPDATE Tasks SET taskName = $1, description = $2, dueDate = $3, teamId = $4 WHERE taskId = $5 RETURNING *',
+            [taskName, description, validDueDate, validTeamId, taskId]
         );
 
         if (result.rows.length === 0) {

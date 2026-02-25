@@ -25,6 +25,7 @@
     - Create the `pm_system` database (if it doesn't exist).
     - Create all tables and types from the schema.
     - Create a default Project Manager user: `pm` / `password123`.
+    - Create a default Admin user: `admin` / `password123`.
 
 Note: Ensure your PostgreSQL server is running and the credentials in `.env` are correct before running this command.
 

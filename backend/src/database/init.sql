@@ -61,7 +61,8 @@ CREATE TABLE Tasks (
     createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     dueDate TIMESTAMP,
     creatorId INTEGER REFERENCES Users(userId) ON DELETE SET NULL,
-    projectId INTEGER REFERENCES Projects(projectId) ON DELETE CASCADE
+    projectId INTEGER REFERENCES Projects(projectId) ON DELETE CASCADE,
+    teamId INTEGER REFERENCES Teams(teamId) ON DELETE SET NULL
 );
 
 -- Table: TeamMembers (Junction Table for Users <-> Teams)
