@@ -76,3 +76,7 @@ typings/
 
 # dotenv logger output
 .env.logger
+
+# File attachments
+uploads/*
+!uploads/.gitkeep

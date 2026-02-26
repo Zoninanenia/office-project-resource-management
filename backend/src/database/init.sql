@@ -1,6 +1,7 @@
 -- Drop existing tables to ensure a clean slate (Order matters due to foreign keys)
 DROP TABLE IF EXISTS TaskDependencies CASCADE;
 DROP TABLE IF EXISTS TasksToWorkers CASCADE;
+DROP TABLE IF EXISTS TaskAttachments CASCADE;
 DROP TABLE IF EXISTS TeamMembers CASCADE;
 DROP TABLE IF EXISTS Tasks CASCADE;
 DROP TABLE IF EXISTS Teams CASCADE;
@@ -90,3 +91,14 @@ CREATE TABLE TaskDependencies (
     PRIMARY KEY (taskId, dependsOnTaskId)
 );
 
+-- Table:TaskAttachments
+CREATE TABLE TaskAttachments (
+    attachmentId  SERIAL PRIMARY KEY,
+    taskId        INTEGER REFERENCES Tasks(taskId) ON DELETE CASCADE,
+    uploadedBy    INTEGER REFERENCES Users(userId) ON DELETE SET NULL,
+    fileName      VARCHAR(255) NOT NULL,       -- original display name
+    fileUrl       VARCHAR(1024) NOT NULL,      -- storage path / S3 URL
+    fileSize      INTEGER,                     -- bytes
+    mimeType      VARCHAR(100),
+    uploadedAt    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

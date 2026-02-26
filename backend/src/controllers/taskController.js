@@ -1,4 +1,6 @@
 const pool = require('../config/db');
+const fs = require('fs');
+const path = require('path');
 
 // Get all tasks (Global view) - PM sees all, others see assigned/created
 exports.getAllTasks = async (req, res) => {
@@ -254,5 +256,96 @@ exports.updateTask = async (req, res) => {
         res.status(500).json({ message: err.message || 'Server Error' });
     } finally {
         client.release();
+    }
+};
+
+// Get all attachments for a task
+exports.getTaskAttachments = async (req, res) => {
+    const { taskId } = req.params;
+
+    try {
+        const result = await pool.query(
+            `SELECT a.attachmentId as "attachmentId", a.fileName as "fileName", a.fileUrl as "fileUrl",
+                    a.fileSize as "fileSize", a.mimeType as "mimeType", a.uploadedAt as "uploadedAt",
+                    u.username as "uploadedBy"
+             FROM TaskAttachments a
+             LEFT JOIN Users u ON a.uploadedBy = u.userId
+             WHERE a.taskId = $1
+             ORDER BY a.uploadedAt DESC`,
+            [taskId]
+        );
+
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Get Attachments Error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// Upload an attachment to a task
+exports.uploadAttachment = async (req, res) => {
+    const { taskId } = req.params;
+    const uploadedBy = req.user.userId;
+    const file = req.file;
+
+    if (!file) {
+        return res.status(400).json({ message: 'No file provided' });
+    }
+
+    try {
+        // Verify the task exists before attaching
+        const taskCheck = await pool.query(
+            'SELECT taskId FROM Tasks WHERE taskId = $1',
+            [taskId]
+        );
+
+        if (taskCheck.rows.length === 0) {
+            return res.status(404).json({ message: 'Task not found' });
+        }
+
+        const result = await pool.query(
+            `INSERT INTO TaskAttachments (taskId, uploadedBy, fileName, fileUrl, fileSize, mimeType)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             RETURNING attachmentId as "attachmentId", fileName as "fileName", fileUrl as "fileUrl",
+                       fileSize as "fileSize", mimeType as "mimeType", uploadedAt as "uploadedAt"`,
+            [taskId, uploadedBy, file.originalname, file.path, file.size, file.mimetype]
+        );
+
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error('Upload Attachment Error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// Delete an attachment
+exports.deleteAttachment = async (req, res) => {
+    const { attachmentId } = req.params;
+
+    try {
+        const lookup = await pool.query(
+            'SELECT fileUrl as "fileUrl" FROM TaskAttachments WHERE attachmentId = $1',
+            [attachmentId]
+        );
+
+        if (lookup.rows.length === 0) {
+            return res.status(404).json({ message: 'Attachment not found' });
+        }
+
+        // Remove file from disk
+        const filePath = path.resolve(lookup.rows[0].fileUrl);
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+        }
+
+        await pool.query(
+            'DELETE FROM TaskAttachments WHERE attachmentId = $1',
+            [attachmentId]
+        );
+
+        res.json({ message: 'Attachment deleted successfully' });
+    } catch (err) {
+        console.error('Delete Attachment Error:', err.message);
+        res.status(500).json({ error: err.message });
     }
 };

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, API_BASE_URL } from '@/lib/api';
 import { Task, User } from '@/types';
 import { useProject } from '../ProjectContext';
 
@@ -28,6 +28,16 @@ interface Team {
     projectTitle: string;
     leader: Member | null;
     members: Member[];
+}
+
+interface Attachment {
+    attachmentId: number;
+    fileName: string;
+    fileUrl: string;
+    fileSize: number | null;
+    mimeType: string | null;
+    uploadedAt: string;
+    uploadedBy: string;
 }
 
 export default function GlobalTasksPage() {
@@ -63,6 +73,12 @@ export default function GlobalTasksPage() {
     const [dropSlotKey, setDropSlotKey] = useState<string | null>(null);
     const [savingDep, setSavingDep] = useState(false);
 
+    // Attachment Panel State
+    const [attachmentTask, setAttachmentTask] = useState<ExtendedTask | null>(null);
+    const [attachments, setAttachments] = useState<Attachment[]>([]);
+    const [attachmentLoading, setAttachmentLoading] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
+    const BACKEND_URL = API_BASE_URL.replace('/api', '');
 
     useEffect(() => {
         const userStr = localStorage.getItem('user');
@@ -236,6 +252,70 @@ export default function GlobalTasksPage() {
         }
     };
 
+    
+    // --- Attachment Handlers ---
+    const handleOpenAttachments = async (task: ExtendedTask) => {
+        setAttachmentTask(task);
+        setAttachments([]);
+        setAttachmentLoading(true);
+        try {
+            const data = await api.get<Attachment[]>(`/tasks/${task.taskId}/attachments`);
+            setAttachments(data);
+        } catch (err: any) {
+            alert(err.message || 'Failed to load attachments');
+        } finally {
+            setAttachmentLoading(false);
+        }
+    };
+
+    const handleUploadAttachment = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!attachmentTask || !e.target.files || e.target.files.length === 0) return;
+        const file = e.target.files[0];
+        const formData = new FormData();
+        formData.append('file', file);
+
+        setIsUploading(true);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_BASE_URL}/tasks/${attachmentTask.taskId}/attachments`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+                body: formData,   // DO NOT set Content-Type here — browser sets it automatically for FormData
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.message || 'Upload failed');
+            }
+            // Refresh attachment list
+            const data = await api.get<Attachment[]>(`/tasks/${attachmentTask.taskId}/attachments`);
+            setAttachments(data);
+        } catch (err: any) {
+            alert(err.message || 'Upload failed');
+        } finally {
+            setIsUploading(false);
+            e.target.value = ''; // reset input
+        }
+    };
+
+    const handleDeleteAttachment = async (attachmentId: number) => {
+        if (!attachmentTask) return;
+        if (!confirm('Delete this attachment?')) return;
+        try {
+            await api.delete(`/tasks/${attachmentTask.taskId}/attachments/${attachmentId}`);
+            setAttachments(prev => prev.filter(a => a.attachmentId !== attachmentId));
+        } catch (err: any) {
+            alert(err.message || 'Failed to delete attachment');
+        }
+    };
+
+    const formatFileSize = (bytes: number | null) => {
+        if (!bytes) return '—';
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    };
+
+
     const toggleAssignee = (userId: string) => {
         setNewTask(prev => {
             if (prev.assignedTo.includes(userId)) {
@@ -393,28 +473,39 @@ export default function GlobalTasksPage() {
             <div className="pl-3">
                 <div className="flex justify-between items-start mb-2">
                     <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100 line-clamp-2 leading-tight pr-12">{task.taskName}</h3>
-
-                    {/* Action Buttons for PMs/Leaders */}
-                    {(userRole === 'project_manager' || userRole === 'team_leader') && (
-                        <div className="absolute top-3 right-3 flex gap-1 z-10 transition-opacity">
-                            <button onClick={() => handleOpenCreateModal(task)}
-                                className="p-1.5 text-gray-400 hover:text-brand-cyan hover:bg-cyan-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                                title="Edit Task">
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                        d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                </svg>
-                            </button>
-                            <button onClick={() => handleDeleteTask(task.taskId, task.taskName)}
-                                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                                title="Delete Task">
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                            </button>
-                        </div>
-                    )}
+                    
+                    {/* File button for people who work on the task */}
+                    <div className="absolute top-3 right-3 flex gap-1 z-10 transition-opacity">
+                        <button
+                            onClick={(e) => { e.stopPropagation(); handleOpenAttachments(task); }}
+                            className="p-1.5 text-gray-400 hover:text-brand-teal hover:bg-teal-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                            title="Attachments">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                    d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+                            </svg>
+                        </button>
+                        {/* Action Buttons for PMs/Leaders */}
+                        {(userRole === 'project_manager' || userRole === 'team_leader') && (
+                        <>
+                        <button onClick={() => handleOpenCreateModal(task)}
+                            className="p-1.5 text-gray-400 hover:text-brand-cyan hover:bg-cyan-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                            title="Edit Task">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                    d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                        </button>
+                        <button onClick={() => handleDeleteTask(task.taskId, task.taskName)}
+                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                            title="Delete Task">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </button>
+                        </>)}
+                    </div>
                 </div>
                 <p className="text-xs font-bold text-brand-teal dark:text-brand-cyan mb-1 uppercase tracking-wider">{task.projectName}</p>
 
@@ -843,6 +934,100 @@ export default function GlobalTasksPage() {
                     </div>
                 )
             }
+            
+            {/* Attachments Modal */}
+            {attachmentTask && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+                    <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 w-full max-w-lg shadow-2xl flex flex-col max-h-[85vh]">
+                        {/* Header */}
+                        <div className="flex justify-between items-start mb-5">
+                            <div>
+                                <h2 className="text-xl font-black text-gray-900 dark:text-white">Attachments</h2>
+                                <p className="text-xs text-gray-400 font-medium mt-0.5 truncate max-w-xs">{attachmentTask.taskName}</p>
+                            </div>
+                            <button
+                                onClick={() => setAttachmentTask(null)}
+                                className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 hover:text-red-500 transition-colors flex-shrink-0">
+                                &times;
+                            </button>
+                        </div>
+
+                        {/* Upload — PM, Team Leader, Worker */}
+                        {(userRole === 'project_manager' || userRole === 'team_leader' || userRole === 'worker') && (
+                            <label className={`flex items-center justify-center gap-2 w-full py-3 mb-4 border-2 border-dashed rounded-xl cursor-pointer transition-all
+                                ${isUploading
+                                    ? 'border-brand-cyan bg-cyan-50 dark:bg-cyan-900/20 text-brand-cyan cursor-not-allowed'
+                                    : 'border-gray-200 dark:border-gray-600 hover:border-brand-cyan hover:bg-cyan-50/50 dark:hover:bg-cyan-900/10 text-gray-400 hover:text-brand-cyan'}`}>
+                                {isUploading ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-brand-cyan border-t-transparent rounded-full animate-spin"></div>
+                                        <span className="text-sm font-bold">Uploading…</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                                        </svg>
+                                        <span className="text-sm font-bold">Click to upload a file</span>
+                                    </>
+                                )}
+                                <input type="file" className="hidden" onChange={handleUploadAttachment} disabled={isUploading} />
+                            </label>
+                        )}
+
+                        {/* File List */}
+                        <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                            {attachmentLoading ? (
+                                <div className="flex justify-center py-10">
+                                    <div className="w-8 h-8 border-2 border-brand-cyan border-t-transparent rounded-full animate-spin"></div>
+                                </div>
+                            ) : attachments.length === 0 ? (
+                                <div className="text-center py-10 text-gray-400">
+                                    <svg className="w-12 h-12 mx-auto mb-3 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+                                    </svg>
+                                    <p className="text-sm font-medium">No attachments yet</p>
+                                </div>
+                            ) : (
+                                attachments.map(att => (
+                                    <div key={att.attachmentId}
+                                         className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-100 dark:border-gray-700 group">
+                                        {/* File icon */}
+                                        <div className="w-9 h-9 rounded-lg bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 flex items-center justify-center flex-shrink-0 shadow-xs">
+                                            <svg className="w-5 h-5 text-brand-teal" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                            </svg>
+                                        </div>
+
+                                        {/* File info */}
+                                        <div className="flex-1 min-w-0">
+                                            <a href={`${BACKEND_URL}/${att.fileUrl}`} target="_blank" rel="noopener noreferrer"
+                                               className="text-sm font-bold text-gray-800 dark:text-gray-100 hover:text-brand-cyan truncate block transition-colors">
+                                                {att.fileName}
+                                            </a>
+                                            <p className="text-[10px] text-gray-400 font-medium mt-0.5">
+                                                {formatFileSize(att.fileSize)} · {att.uploadedBy} · {new Date(att.uploadedAt).toLocaleDateString()}
+                                            </p>
+                                        </div>
+
+                                        {/* Delete — PM / Team Leader only */}
+                                        {(userRole === 'project_manager' || userRole === 'team_leader') && (
+                                            <button
+                                                onClick={() => handleDeleteAttachment(att.attachmentId)}
+                                                className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-gray-600 rounded-lg transition-all flex-shrink-0"
+                                                title="Delete attachment">
+                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                                </svg>
+                                            </button>
+                                        )}
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div >
     );
 }
