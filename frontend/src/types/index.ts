@@ -10,6 +10,7 @@ export interface User {
     lastName?: string;
     profilePic?: string;
     role: UserRole;
+    hourlyWage?: number;
     createdAt: string;
 }
 
@@ -53,11 +54,26 @@ export interface Task {
     projectId: number;
     teamId?: number;
     teamName?: string;
+    sprintId?: number;
+    sprintName?: string;
+    estimatedHours?: number;
     dependencies?: number[];
     assignees?: {
         workerId: number;
         workerName: string;
     }[];
+}
+
+export interface Sprint {
+    sprintId: number;
+    sprintName: string;
+    projectId: number;
+    startDate: string;
+    endDate: string;
+    status: 'planned' | 'active' | 'completed';
+    createdAt: string;
+    taskCount?: number;
+    completedTaskCount?: number;
 }
 
 export interface TeamMember {

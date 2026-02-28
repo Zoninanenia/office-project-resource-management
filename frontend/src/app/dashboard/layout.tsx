@@ -65,6 +65,8 @@ export default function DashboardLayout({
     if (path.includes('/projects')) return 'Projects';
     if (path.includes('/tasks')) return 'Tasks';
     if (path.includes('/teams')) return 'Teams';
+    if (path.includes('/sprints')) return 'Sprints';
+    if (path.includes('/wages')) return 'Wages';
     if (path.includes('/issues')) return 'Issues';
     if (path.includes('/settings')) return 'Settings';
     if (path.includes('/users')) return 'Users';
@@ -130,6 +132,10 @@ export default function DashboardLayout({
               <TooltipNavItem href="/dashboard/projects" icon={<FolderIcon />} label="Projects" active={isActive('/dashboard/projects')} expanded={isSidebarExpanded} />
               <TooltipNavItem href="/dashboard/tasks" icon={<ListIcon />} label="My Tasks" active={isActive('/dashboard/tasks')} expanded={isSidebarExpanded} />
               <TooltipNavItem href="/dashboard/teams" icon={<UsersIcon />} label="Teams" active={isActive('/dashboard/teams')} expanded={isSidebarExpanded} />
+              <TooltipNavItem href="/dashboard/sprints" icon={<SprintIcon />} label="Sprints" active={isActive('/dashboard/sprints')} expanded={isSidebarExpanded} />
+              {userRole === 'project_manager' && (
+                <TooltipNavItem href="/dashboard/wages" icon={<WageIcon />} label="Wages" active={isActive('/dashboard/wages')} expanded={isSidebarExpanded} />
+              )}
               <TooltipNavItem href="/dashboard/issues" icon={<BugIcon />} label="Issues" active={isActive('/dashboard/issues')} expanded={isSidebarExpanded} />
 
               <div className="my-2 border-t border-gray-800 w-full"></div>
@@ -409,6 +415,22 @@ function AdminIcon() {
   return (
     <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+    </svg>
+  )
+}
+
+function SprintIcon() {
+  return (
+    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+    </svg>
+  )
+}
+
+function WageIcon() {
+  return (
+    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
   )
 }

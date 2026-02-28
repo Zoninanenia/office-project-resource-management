@@ -4,6 +4,7 @@ DROP TABLE IF EXISTS TasksToWorkers CASCADE;
 DROP TABLE IF EXISTS TaskAttachments CASCADE;
 DROP TABLE IF EXISTS TeamMembers CASCADE;
 DROP TABLE IF EXISTS Tasks CASCADE;
+DROP TABLE IF EXISTS Sprints CASCADE;
 DROP TABLE IF EXISTS Teams CASCADE;
 DROP TABLE IF EXISTS Projects CASCADE;
 DROP TABLE IF EXISTS Users CASCADE;
@@ -30,6 +31,7 @@ CREATE TABLE Users (
     lastName VARCHAR(255),
     profilePic VARCHAR(255),
     role user_role_enum DEFAULT 'user',
+    hourlyWage DECIMAL(10, 2) DEFAULT 0,
     createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -53,6 +55,17 @@ CREATE TABLE Teams (
     createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Table: Sprints
+CREATE TABLE Sprints (
+    sprintId SERIAL PRIMARY KEY,
+    sprintName VARCHAR(255) NOT NULL,
+    projectId INTEGER REFERENCES Projects(projectId) ON DELETE CASCADE,
+    startDate DATE NOT NULL,
+    endDate DATE NOT NULL,
+    status VARCHAR(20) DEFAULT 'planned',
+    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Table: Tasks
 CREATE TABLE Tasks (
     taskId SERIAL PRIMARY KEY,
@@ -63,7 +76,9 @@ CREATE TABLE Tasks (
     dueDate TIMESTAMP,
     creatorId INTEGER REFERENCES Users(userId) ON DELETE SET NULL,
     projectId INTEGER REFERENCES Projects(projectId) ON DELETE CASCADE,
-    teamId INTEGER REFERENCES Teams(teamId) ON DELETE SET NULL
+    teamId INTEGER REFERENCES Teams(teamId) ON DELETE SET NULL,
+    sprintId INTEGER REFERENCES Sprints(sprintId) ON DELETE SET NULL,
+    estimatedHours DECIMAL(6, 2)
 );
 
 -- Table: TeamMembers (Junction Table for Users <-> Teams)

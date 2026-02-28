@@ -34,6 +34,7 @@ export default function ProjectDetailPage() {
         description: '',
         status: 'todo',
         dueDate: '',
+        estimatedHours: '',
         assignedTo: [] as string[],
         dependencies: [] as number[],
     });
@@ -122,6 +123,7 @@ export default function ProjectDetailPage() {
                 description: taskToEdit.description || '',
                 status: taskToEdit.status,
                 dueDate: isoDate,
+                estimatedHours: taskToEdit.estimatedHours ? taskToEdit.estimatedHours.toString() : '',
                 assignedTo: taskToEdit.assignees ? taskToEdit.assignees.map((a: any) => a.workerId.toString()) : [],
                 dependencies: taskToEdit.dependencies || [],
             });
@@ -133,6 +135,7 @@ export default function ProjectDetailPage() {
                 description: '',
                 status: 'todo',
                 dueDate: '',
+                estimatedHours: '',
                 assignedTo: [],
                 dependencies: [],
             });
@@ -155,7 +158,7 @@ export default function ProjectDetailPage() {
             // Re-fetch tasks
             const tasksData = await api.get<Task[]>('/tasks');
             setTasks(tasksData.filter(t => t.projectId === projectId));
-            setNewTask({ taskName: '', description: '', status: 'todo', dueDate: '', assignedTo: [], dependencies: [] });
+            setNewTask({ taskName: '', description: '', status: 'todo', dueDate: '', estimatedHours: '', assignedTo: [], dependencies: [] });
         } catch (err: any) {
             alert(err.message || 'Failed to process task');
         }
@@ -622,7 +625,7 @@ export default function ProjectDetailPage() {
                                 />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-3 gap-4">
                                 <div>
                                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Due Date</label>
                                     <input
@@ -631,6 +634,18 @@ export default function ProjectDetailPage() {
                                         value={newTask.dueDate}
                                         onChange={e => setNewTask({ ...newTask, dueDate: e.target.value })}
                                         className="w-full p-3 bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-brand-cyan rounded-xl font-bold outline-none transition-all dark:text-white"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Est. Hours</label>
+                                    <input
+                                        type="number"
+                                        step="0.5"
+                                        min="0"
+                                        value={newTask.estimatedHours}
+                                        onChange={e => setNewTask({ ...newTask, estimatedHours: e.target.value })}
+                                        className="w-full p-3 bg-gray-50 dark:bg-gray-700 border-2 border-transparent focus:border-brand-cyan rounded-xl font-bold outline-none transition-all dark:text-white"
+                                        placeholder="e.g. 8"
                                     />
                                 </div>
                                 <div className="relative">

@@ -30,6 +30,8 @@ const taskRoutes = require('./src/routes/taskRoutes');
 const teamRoutes = require('./src/routes/teamRoutes');
 const userRoutes = require('./src/routes/userRoutes');
 const dashboardRoutes = require('./src/routes/dashboardRoutes');
+const sprintRoutes = require('./src/routes/sprintRoutes');
+const wageRoutes = require('./src/routes/wageRoutes');
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -38,6 +40,8 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/sprints', sprintRoutes);
+app.use('/api/wages', wageRoutes);
 app.use('/uploads', express.static('uploads'));
 
 // Error Handling Middleware
