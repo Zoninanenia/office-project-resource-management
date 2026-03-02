@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { User, UserRole } from '@/types';
+import { SearchBar } from '@/components/SearchBar';
+import { StatusBadge } from '@/components/StatusBadge';
 
 export default function UserManagementPage() {
     const [users, setUsers] = useState<User[]>([]);
@@ -92,18 +94,12 @@ export default function UserManagementPage() {
                 </div>
 
                 <div className="flex gap-4 w-full md:w-auto">
-                    <div className="relative group w-full md:w-64">
-                        <input
-                            type="text"
-                            placeholder="Find user..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="pl-10 pr-4 py-2.5 w-full bg-white dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 rounded-xl font-bold text-gray-700 dark:text-white outline-none focus:border-brand-cyan transition-all shadow-sm"
-                        />
-                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                            <SearchIcon className="w-5 h-5" />
-                        </div>
-                    </div>
+                    <SearchBar
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Find user..."
+                        className="w-full md:w-64"
+                    />
 
                     <button
                         onClick={() => setShowCreateModal(true)}
@@ -143,14 +139,7 @@ export default function UserManagementPage() {
                         <p className="text-gray-400 dark:text-gray-500 text-xs font-bold mb-4 uppercase tracking-widest">@{user.username}</p>
 
                         <div className="mb-6">
-                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${user.role === 'admin' ? 'bg-purple-500/10 text-purple-500' :
-                                user.role === 'project_manager' ? 'bg-brand-peach/10 text-brand-peach' :
-                                    user.role === 'team_leader' ? 'bg-brand-cyan/10 text-brand-cyan' :
-                                        user.role === 'worker' ? 'bg-brand-sage/10 text-brand-sage' :
-                                            'bg-gray-100 dark:bg-gray-700 text-gray-500'
-                                }`}>
-                                {user.role.replace('_', ' ')}
-                            </span>
+                            <StatusBadge status={user.role} type="user" />
                         </div>
 
                         <div className="w-full mt-auto">
@@ -162,7 +151,8 @@ export default function UserManagementPage() {
                                 <select
                                     value={user.role}
                                     onChange={(e) => handleRoleChange(user.userId, e.target.value as UserRole)}
-                                    className="w-full py-2 px-3 bg-gray-50 dark:bg-gray-900 border-none rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-cyan cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                    disabled={user.role === 'admin'}
+                                    className={`w-full py-2 px-3 bg-gray-50 dark:bg-gray-900 border-none rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-cyan transition-colors ${user.role === 'admin' ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700'}`}
                                 >
                                     <option value="user">User</option>
                                     <option value="worker">Worker</option>

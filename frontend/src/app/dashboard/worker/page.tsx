@@ -4,6 +4,9 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { Task, TaskStatus } from '@/types';
+import { StatCard } from '@/components/StatCard';
+import { SearchBar } from '@/components/SearchBar';
+import { StatusBadge } from '@/components/StatusBadge';
 
 interface DashboardStats {
     activeProjects: number;
@@ -239,7 +242,6 @@ export default function WorkerPage() {
                     </div>
                 </div>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatCard title="Active Projects" value={stats.activeProjects} color="from-brand-cyan to-blue-500" trend="Linked to your tasks" />
                 <StatCard title="Open Tasks" value={stats.tasksAssigned} color="from-brand-peach to-orange-500" trend="Need status updates" />
@@ -253,12 +255,10 @@ export default function WorkerPage() {
                         <h2 className="text-xl font-black text-gray-800 dark:text-white">My Assigned Tasks</h2>
 
                         <div className="flex flex-col sm:flex-row gap-3">
-                            <input
-                                type="text"
-                                placeholder="Search tasks..."
+                            <SearchBar
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                className="pl-4 pr-4 py-2.5 bg-white dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 rounded-xl font-bold text-gray-700 dark:text-white outline-none focus:border-cyan-400 transition-all shadow-sm"
+                                placeholder="Search tasks..."
                             />
                             <select
                                 value={statusFilter}
@@ -294,9 +294,7 @@ export default function WorkerPage() {
                                         <div className="flex-1">
                                             <div className="flex items-center gap-3 flex-wrap">
                                                 <h3 className="text-base font-black text-gray-800 dark:text-gray-100">{task.taskName}</h3>
-                                                <span className={`text-xs px-2.5 py-1 rounded-full font-bold ${getStatusStyle(task.status)}`}>
-                                                    {formatStatus(task.status)}
-                                                </span>
+                                                <StatusBadge status={task.status} type="task" />
                                             </div>
                                             <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
                                                 {task.description || 'No description'}
@@ -404,18 +402,7 @@ function isOverdue(task: ExtendedTask, today: Date) {
     return due.getTime() < today.getTime() && task.status !== 'done';
 }
 
-function StatCard({ title, value, color, trend }: { title: string; value: number | string; color: string; trend: string }) {
-    return (
-        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-md border border-gray-100 dark:border-gray-700">
-            <div className="flex justify-between items-start mb-4">
-                <div className={`p-4 rounded-2xl bg-linear-to-br ${color} shadow-lg`} />
-                <span className="text-xs font-bold text-gray-400 bg-gray-50 dark:bg-gray-700 dark:text-gray-300 px-2 py-1 rounded-full">{trend}</span>
-            </div>
-            <h3 className="text-gray-500 dark:text-gray-400 font-bold text-sm uppercase tracking-wider">{title}</h3>
-            <p className="text-3xl font-black text-gray-800 dark:text-gray-100">{value}</p>
-        </div>
-    );
-}
+
 
 function QuickStat({ label, value, tone }: { label: string; value: number; tone: 'warn' | 'info' | 'ok' }) {
     const toneStyle =

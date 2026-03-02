@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Project, Task } from '@/types';
 import Link from 'next/link';
+import { SearchBar } from '@/components/SearchBar';
 
 interface Member {
     userId: number;
@@ -28,11 +29,11 @@ interface Team {
 
 // // Calculate Progress based on tasks
 export function getProjectProgress(tasks: Task[], projectId: number): number {
-  const projectTasks = tasks.filter(t => t.projectId === projectId);
-  if (projectTasks.length === 0) return 0;
-  const totalTasks = projectTasks.length;
-  const completedTasks = projectTasks.filter(t => t.status === 'done').length;
-  return Math.round((completedTasks / totalTasks) * 100);
+    const projectTasks = tasks.filter(t => t.projectId === projectId);
+    if (projectTasks.length === 0) return 0;
+    const totalTasks = projectTasks.length;
+    const completedTasks = projectTasks.filter(t => t.status === 'done').length;
+    return Math.round((completedTasks / totalTasks) * 100);
 }
 
 export default function ProjectsPage() {
@@ -47,7 +48,7 @@ export default function ProjectsPage() {
     const [userId, setUserId] = useState<string | null>(null);
 
 
-    
+
     useEffect(() => {
         const fetchProjects = async () => {
             try {
@@ -121,7 +122,7 @@ export default function ProjectsPage() {
         return matchesSearch && matchesStatus && hasAccess;
     });
 
-    
+
 
 
 
@@ -141,18 +142,12 @@ export default function ProjectsPage() {
 
                 {/* Search & Filter Bar */}
                 <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
-                    <div className="relative group">
-                        <input
-                            type="text"
-                            placeholder="Search tasks..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="pl-10 pr-4 py-3 w-full sm:w-64 bg-white dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 rounded-xl font-bold text-gray-700 dark:text-white outline-none focus:border-cyan-400 transition-all shadow-sm"
-                        />
-                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-cyan-500 transition-colors">
-                            <SearchIcon className="w-5 h-5" />
-                        </div>
-                    </div>
+                    <SearchBar
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Search tasks..."
+                        className="w-full sm:w-64"
+                    />
 
                     <select
                         value={statusFilter}
@@ -160,7 +155,7 @@ export default function ProjectsPage() {
                         className="px-4 py-3 bg-white dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 rounded-xl font-bold text-gray-700 dark:text-gray-200 outline-none focus:border-cyan-400 cursor-pointer shadow-sm"
                     >
                         <option>All Status</option>
-                        { /* <option value="planning">Planning</option>*/ }
+                        { /* <option value="planning">Planning</option>*/}
                         <option value="active">Active</option>
                         <option value="completed">Completed</option>
                     </select>

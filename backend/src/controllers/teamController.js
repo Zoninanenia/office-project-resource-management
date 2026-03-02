@@ -87,6 +87,19 @@ exports.getAllTeams = async (req, res) => {
                 m.completedTasks = stat.completed;
                 m.progress = stat.total > 0 ? Math.round((stat.completed / stat.total) * 100) : 0;
             });
+
+            // Add Team-level stats
+            const teamStatsQuery = `
+                SELECT 
+                    COUNT(taskId) as "totalTeamTasks",
+                    COUNT(CASE WHEN status = 'done' THEN 1 END) as "completedTeamTasks"
+                FROM Tasks
+                WHERE teamId = $1
+            `;
+            const teamStatsRes = await db.query(teamStatsQuery, [team.teamId]);
+            team.totalTasks = parseInt(teamStatsRes.rows[0].totalTeamTasks) || 0;
+            team.completedTasks = parseInt(teamStatsRes.rows[0].completedTeamTasks) || 0;
+            team.progress = team.totalTasks > 0 ? Math.round((team.completedTasks / team.totalTasks) * 100) : 0;
         }
 
         res.json(teams);

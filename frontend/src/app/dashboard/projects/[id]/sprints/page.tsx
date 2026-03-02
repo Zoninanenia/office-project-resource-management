@@ -2,13 +2,16 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { api } from '@/lib/api';
-import { Sprint, Task, Project } from '@/types';
+import { Sprint, Task } from '@/types';
+import { useParams } from 'next/navigation';
+import Link from 'next/link';
 
 export default function SprintsPage() {
+    const params = useParams();
+    const projectId = params?.id ? parseInt(params.id as string) : null;
+
     const [sprints, setSprints] = useState<Sprint[]>([]);
     const [tasks, setTasks] = useState<Task[]>([]);
-    const [projects, setProjects] = useState<Project[]>([]);
-    const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
     const [userRole, setUserRole] = useState<string | null>(null);
 
@@ -38,23 +41,10 @@ export default function SprintsPage() {
             setUserRole(JSON.parse(userStr).role);
         }
 
-        const fetchProjects = async () => {
-            try {
-                const data = await api.get<Project[]>('/projects');
-                setProjects(data);
-                if (data.length > 0) {
-                    setSelectedProjectId(data[0].projectId);
-                }
-            } catch (err) {
-                console.error('Failed to fetch projects', err);
-            }
-        };
-
-        fetchProjects();
-    }, []);
+        }, []);
 
     useEffect(() => {
-        if (!selectedProjectId) {
+        if (!projectId) {
             setLoading(false);
             return;
         }
@@ -63,11 +53,11 @@ export default function SprintsPage() {
             setLoading(true);
             try {
                 const [sprintsData, tasksData] = await Promise.all([
-                    api.get<Sprint[]>(`/sprints/project/${selectedProjectId}`),
+                    api.get<Sprint[]>(`/sprints/project/${projectId}`),
                     api.get<Task[]>('/tasks'),
                 ]);
                 setSprints(sprintsData);
-                setTasks(tasksData.filter(t => t.projectId === selectedProjectId));
+                setTasks(tasksData.filter(t => t.projectId === projectId));
             } catch (err) {
                 console.error('Failed to fetch sprint data', err);
             } finally {
@@ -76,7 +66,7 @@ export default function SprintsPage() {
         };
 
         fetchData();
-    }, [selectedProjectId]);
+    }, [projectId]);
 
     const backlogTasks = useMemo(() =>
         tasks.filter(t => !t.sprintId),
@@ -90,7 +80,7 @@ export default function SprintsPage() {
     const handleCreateOrUpdate = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!form.sprintName.trim() || !form.startDate || !form.endDate) return;
-        if (!selectedProjectId) {
+        if (!projectId) {
             alert('Please select a project first');
             return;
         }
@@ -99,10 +89,10 @@ export default function SprintsPage() {
             if (editingSprint) {
                 await api.put(`/sprints/${editingSprint.sprintId}`, form);
             } else {
-                await api.post(`/sprints/project/${selectedProjectId}`, form);
+                await api.post(`/sprints/project/${projectId}`, form);
             }
             // Refresh
-            const data = await api.get<Sprint[]>(`/sprints/project/${selectedProjectId}`);
+            const data = await api.get<Sprint[]>(`/sprints/project/${projectId}`);
             setSprints(data);
             setShowModal(false);
             setEditingSprint(null);
@@ -117,11 +107,11 @@ export default function SprintsPage() {
         try {
             await api.delete(`/sprints/${sprintId}`);
             const [sprintsData, tasksData] = await Promise.all([
-                api.get<Sprint[]>(`/sprints/project/${selectedProjectId}`),
+                api.get<Sprint[]>(`/sprints/project/${projectId}`),
                 api.get<Task[]>('/tasks'),
             ]);
             setSprints(sprintsData);
-            setTasks(tasksData.filter(t => t.projectId === selectedProjectId));
+            setTasks(tasksData.filter(t => t.projectId === projectId));
         } catch (err: any) {
             alert(err.message || 'Failed to delete sprint');
         }
@@ -144,9 +134,9 @@ export default function SprintsPage() {
             await api.put(`/sprints/${assignSprintId}/tasks/${taskId}`, {});
             // Refresh tasks
             const tasksData = await api.get<Task[]>('/tasks');
-            setTasks(tasksData.filter(t => t.projectId === selectedProjectId));
+            setTasks(tasksData.filter(t => t.projectId === projectId));
             // Refresh sprint counts
-            const sprintsData = await api.get<Sprint[]>(`/sprints/project/${selectedProjectId}`);
+            const sprintsData = await api.get<Sprint[]>(`/sprints/project/${projectId}`);
             setSprints(sprintsData);
         } catch (err: any) {
             alert(err.message || 'Failed to assign task');
@@ -157,8 +147,8 @@ export default function SprintsPage() {
         try {
             await api.delete(`/sprints/tasks/${taskId}`);
             const tasksData = await api.get<Task[]>('/tasks');
-            setTasks(tasksData.filter(t => t.projectId === selectedProjectId));
-            const sprintsData = await api.get<Sprint[]>(`/sprints/project/${selectedProjectId}`);
+            setTasks(tasksData.filter(t => t.projectId === projectId));
+            const sprintsData = await api.get<Sprint[]>(`/sprints/project/${projectId}`);
             setSprints(sprintsData);
         } catch (err: any) {
             alert(err.message || 'Failed to remove task from sprint');
@@ -189,11 +179,11 @@ export default function SprintsPage() {
             alert(result.message || 'Tasks carried over successfully');
             // Refresh data
             const [sprintsData, tasksData] = await Promise.all([
-                api.get<Sprint[]>(`/sprints/project/${selectedProjectId}`),
+                api.get<Sprint[]>(`/sprints/project/${projectId}`),
                 api.get<Task[]>('/tasks'),
             ]);
             setSprints(sprintsData);
-            setTasks(tasksData.filter(t => t.projectId === selectedProjectId));
+            setTasks(tasksData.filter(t => t.projectId === projectId));
             setShowCarryOverModal(false);
             setCarryOverFromId(null);
             setCarryOverToId(null);
@@ -206,11 +196,11 @@ export default function SprintsPage() {
         try {
             await api.put(`/sprints/tasks/${taskId}/move`, { toSprintId });
             const [sprintsData, tasksData] = await Promise.all([
-                api.get<Sprint[]>(`/sprints/project/${selectedProjectId}`),
+                api.get<Sprint[]>(`/sprints/project/${projectId}`),
                 api.get<Task[]>('/tasks'),
             ]);
             setSprints(sprintsData);
-            setTasks(tasksData.filter(t => t.projectId === selectedProjectId));
+            setTasks(tasksData.filter(t => t.projectId === projectId));
             setMovingTaskId(null);
         } catch (err: any) {
             alert(err.message || 'Failed to move task');
@@ -280,23 +270,14 @@ export default function SprintsPage() {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
+                    <Link href={`/dashboard/projects/${projectId}`} className="text-sm font-bold text-cyan-500 hover:text-cyan-400 transition-colors mb-4 inline-block">
+                        ← Back to Project Details
+                    </Link>
                     <h1 className="text-4xl font-black text-gray-800 dark:text-white tracking-tight mb-2">Sprints & Timeline</h1>
                     <p className="text-gray-500 dark:text-gray-400">Organize your project timeline with sprints.</p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-                    {/* Project Selector */}
-                    <select
-                        value={selectedProjectId || ''}
-                        onChange={(e) => {
-                            const val = Number(e.target.value);
-                            setSelectedProjectId(isNaN(val) ? null : val);
-                        }}
-                        className="px-4 py-3 bg-white dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 rounded-xl font-bold text-gray-700 dark:text-gray-200 outline-none focus:border-cyan-400 cursor-pointer shadow-sm"
-                    >
-                        {projects.map(p => (
-                            <option key={p.projectId} value={p.projectId}>{p.title}</option>
-                        ))}
-                    </select>
+
 
                     {/* View Toggle */}
                     <div className="flex bg-white dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm">
@@ -326,7 +307,7 @@ export default function SprintsPage() {
                 </div>
             </div>
 
-            {!selectedProjectId ? (
+            {!projectId ? (
                 <div className="text-center py-20 bg-white dark:bg-gray-800 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700">
                     <p className="text-gray-400 font-bold text-lg">No project selected.</p>
                     <p className="text-gray-400 text-sm mt-1">Please select a project to manage sprints.</p>

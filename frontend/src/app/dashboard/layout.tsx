@@ -132,7 +132,7 @@ export default function DashboardLayout({
               <TooltipNavItem href="/dashboard/projects" icon={<FolderIcon />} label="Projects" active={isActive('/dashboard/projects')} expanded={isSidebarExpanded} />
               <TooltipNavItem href="/dashboard/tasks" icon={<ListIcon />} label="My Tasks" active={isActive('/dashboard/tasks')} expanded={isSidebarExpanded} />
               <TooltipNavItem href="/dashboard/teams" icon={<UsersIcon />} label="Teams" active={isActive('/dashboard/teams')} expanded={isSidebarExpanded} />
-              <TooltipNavItem href="/dashboard/sprints" icon={<SprintIcon />} label="Sprints" active={isActive('/dashboard/sprints')} expanded={isSidebarExpanded} />
+
               {userRole === 'project_manager' && (
                 <TooltipNavItem href="/dashboard/wages" icon={<WageIcon />} label="Wages" active={isActive('/dashboard/wages')} expanded={isSidebarExpanded} />
               )}

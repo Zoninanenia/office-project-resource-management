@@ -3,8 +3,10 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { User } from '@/types';
 import { useProject } from '../ProjectContext';
+import { Avatar, AvatarGroup } from '@/components/Avatar';
 
 interface Member {
     userId: number;
@@ -24,6 +26,9 @@ interface Team {
     projectTitle: string;
     leader: Member | null;
     members: Member[];
+    totalTasks?: number;
+    completedTasks?: number;
+    progress?: number;
 }
 
 interface Project {
@@ -32,6 +37,7 @@ interface Project {
 }
 
 export default function TeamsPage() {
+    const router = useRouter();
     const [teams, setTeams] = useState<Team[]>([]);
     const [loading, setLoading] = useState(true);
     const [users, setUsers] = useState<User[]>([]);
@@ -345,16 +351,20 @@ export default function TeamsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
                 {/* {teams.map((team) => ( */}
                 {getRoleBasedTeams().map((team) => (
-                    <div key={team.teamId} className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm hover:shadow-xl hover:-translate-y-2 transition-all duration-300 border border-white/60 dark:border-gray-700 flex flex-col overflow-hidden group">
+                    <div
+                        key={team.teamId}
+                        onClick={() => router.push(`/dashboard/teams/${team.teamId}`)}
+                        className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm hover:shadow-xl hover:-translate-y-2 transition-all duration-300 border border-white/60 dark:border-gray-700 flex flex-col overflow-hidden group cursor-pointer"
+                    >
 
                         {/* Card Header (Gradient) */}
                         <div className="h-28 bg-linear-to-r from-brand-cyan to-brand-teal relative p-6">
                             {(userRole === 'project_manager') && (
                                 <div className="absolute top-4 right-4 z-20 flex gap-2">
-                                    <button onClick={() => openWizard(team)} className="p-1.5 bg-white/20 hover:bg-white/40 text-white rounded-lg backdrop-blur-xs transition-colors" title="Edit Team">
+                                    <button onClick={(e) => { e.stopPropagation(); openWizard(team); }} className="p-1.5 bg-white/20 hover:bg-white/40 text-white rounded-lg backdrop-blur-xs transition-colors" title="Edit Team">
                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                     </button>
-                                    <button onClick={() => handleDeleteTeam(team.teamId, team.teamName)} className="p-1.5 bg-red-500/50 hover:bg-red-500/80 text-white rounded-lg backdrop-blur-xs transition-colors" title="Delete Team">
+                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteTeam(team.teamId, team.teamName); }} className="p-1.5 bg-red-500/50 hover:bg-red-500/80 text-white rounded-lg backdrop-blur-xs transition-colors" title="Delete Team">
                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                     </button>
                                 </div>
@@ -371,11 +381,11 @@ export default function TeamsPage() {
                         {/* Leader Section (Overlap) */}
                         <div className="px-6 flex justify-between items-end -mt-10 relative z-10">
                             <div className="flex flex-col items-center">
-                                <div className="w-20 h-20 rounded-2xl bg-white dark:bg-gray-800 p-1 shadow-md transition-colors">
-                                    <div className="w-full h-full rounded-xl bg-brand-peach/20 flex items-center justify-center text-brand-peach font-bold text-2xl border-2 border-brand-peach/30">
-                                        {team.leader?.name.charAt(0) || '?'}
-                                    </div>
-                                </div>
+                                <Avatar
+                                    name={team.leader?.name || ''}
+                                    size="xl"
+                                    className="border-4 border-white dark:border-gray-800 shadow-md"
+                                />
                                 <div className="mt-2 text-center">
                                     <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Leader</p>
                                     <p className="text-sm font-bold text-gray-800 dark:text-gray-100 truncate max-w-[120px]">{team.leader?.name || 'Unassigned'}</p>
@@ -383,7 +393,7 @@ export default function TeamsPage() {
                             </div>
                             {(userRole === 'project_manager' || userRole === 'team_leader') && (
                                 <button
-                                    onClick={() => openAddMemberModal(team.teamId)}
+                                    onClick={(e) => { e.stopPropagation(); openAddMemberModal(team.teamId); }}
                                     className="mb-4 bg-brand-sage/20 text-brand-sage p-3 rounded-xl hover:bg-brand-sage/30 hover:scale-110 transition-all font-bold shadow-sm"
                                     title="Add Member"
                                 >
@@ -398,7 +408,7 @@ export default function TeamsPage() {
                                 {team.members.length} Members
                             </div>
                             <div className="px-3 py-1 rounded-lg bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-100 dark:border-cyan-900/30 text-xs font-bold text-brand-cyan">
-                                {team.members.reduce((acc, m) => acc + m.totalTasks, 0)} Tasks
+                                {team.totalTasks !== undefined ? team.totalTasks : team.members.reduce((acc, m) => acc + m.totalTasks, 0)} Tasks
                             </div>
                         </div>
 
@@ -410,9 +420,11 @@ export default function TeamsPage() {
                                 <div className="space-y-3">
                                     {team.members.slice(0, 3).map((member) => (
                                         <div key={member.userId} className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${member.role.includes('leader') ? 'bg-brand-peach/20 text-brand-peach' : 'bg-gray-100 dark:bg-gray-700 text-gray-500'}`}>
-                                                {member.name.charAt(0)}
-                                            </div>
+                                            <Avatar
+                                                name={member.name}
+                                                size="md"
+                                                colorClass={member.role.includes('leader') ? 'bg-brand-peach/20 text-brand-peach' : 'bg-gray-100 dark:bg-gray-700 text-gray-500'}
+                                            />
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex justify-between items-center mb-1">
                                                     <p className="text-sm font-bold text-gray-700 dark:text-gray-200 truncate">{member.name}</p>
