@@ -22,7 +22,7 @@ CREATE TYPE team_role_enum AS ENUM ('leader', 'member', 'observer');
 CREATE TYPE task_status_enum AS ENUM ('todo', 'in_progress', 'review', 'done');
 CREATE TYPE user_role_enum AS ENUM ('admin', 'project_manager', 'team_leader', 'worker', 'user');
 CREATE TYPE project_status_enum AS ENUM ('active', 'completed');
-CREATE TYPE notification_type_enum AS ENUM ('assignment', 'deadline');
+CREATE TYPE notification_type_enum AS ENUM ('assignment', 'deadline', 'mention');
 
 -- Table: Users
 CREATE TABLE Users (

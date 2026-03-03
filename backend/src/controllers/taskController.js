@@ -388,7 +388,7 @@ exports.getTaskComments = async (req, res) => {
     }
 };
 
-// Add a comment to a task
+// Add a comment to a task (with @mention detection)
 exports.addTaskComment = async (req, res) => {
     const { taskId } = req.params;
     const { comment } = req.body;
@@ -398,17 +398,86 @@ exports.addTaskComment = async (req, res) => {
         return res.status(400).json({ message: 'Comment text is required' });
     }
 
+    const client = await pool.connect();
+
     try {
-        const result = await pool.query(
-            `INSERT INTO TaskComments (taskId, userId, comment) 
-             VALUES ($1, $2, $3) 
+        await client.query('BEGIN');
+
+        // Check if task exists (need task name for notification message)
+        const taskCheck = await client.query(
+            'SELECT taskId, taskName AS "taskName" FROM Tasks WHERE taskId = $1',
+            [taskId]
+        );
+
+        if (taskCheck.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ message: 'Task not found' });
+        }
+
+        const taskName = taskCheck.rows[0].taskName;
+
+        // Save the comment
+        const result = await client.query(
+            `INSERT INTO TaskComments (taskId, userId, comment)
+             VALUES ($1, $2, $3)
              RETURNING taskCommentId as "taskCommentId", comment, createdDate as "createdDate"`,
             [taskId, userId, comment]
         );
-        res.status(201).json(result.rows[0]);
+
+        // Detect @mentions using regex
+        const mentionRegex = /@(\w+)/g;
+        const matches = [];
+        let match;
+
+        while ((match = mentionRegex.exec(comment)) !== null) {
+            matches.push(match[1]);
+        }
+
+        const uniqueUsernames = [...new Set(matches)];
+        const mentionedUsers = [];
+
+        // For each @username, check if user exists and create notification
+        for (const username of uniqueUsernames) {
+            const userResult = await client.query(
+                'SELECT userId AS "userId", username FROM Users WHERE username = $1',
+                [username]
+            );
+
+            if (userResult.rows.length === 0) continue;
+
+            const mentionedUser = userResult.rows[0];
+
+            // Don't notify yourself
+            if (mentionedUser.userId === userId) continue;
+
+            // Get commenter's username for the notification message
+            const commenter = await client.query(
+                'SELECT username FROM Users WHERE userId = $1',
+                [userId]
+            );
+
+            const message = `${commenter.rows[0].username} mentioned you in task "${taskName}"`;
+
+            await client.query(
+                `INSERT INTO Notifications (userId, taskId, type, message) VALUES ($1, $2, $3, $4)`,
+                [mentionedUser.userId, taskId, 'mention', message]
+            );
+
+            mentionedUsers.push(mentionedUser);
+        }
+
+        await client.query('COMMIT');
+
+        res.status(201).json({
+            ...result.rows[0],
+            mentionedUsers
+        });
     } catch (err) {
+        await client.query('ROLLBACK');
         console.error('Add Task Comment Error:', err.message);
         res.status(500).json({ error: 'Server Error' });
+    } finally {
+        client.release();
     }
 };
 
