@@ -1,7 +1,9 @@
 -- Drop existing tables to ensure a clean slate (Order matters due to foreign keys)
+DROP TABLE IF EXISTS Notifications CASCADE;
 DROP TABLE IF EXISTS TaskDependencies CASCADE;
 DROP TABLE IF EXISTS TasksToWorkers CASCADE;
 DROP TABLE IF EXISTS TaskAttachments CASCADE;
+DROP TABLE IF EXISTS TaskComments CASCADE;
 DROP TABLE IF EXISTS TeamMembers CASCADE;
 DROP TABLE IF EXISTS Tasks CASCADE;
 DROP TABLE IF EXISTS Sprints CASCADE;
@@ -20,6 +22,7 @@ CREATE TYPE team_role_enum AS ENUM ('leader', 'member', 'observer');
 CREATE TYPE task_status_enum AS ENUM ('todo', 'in_progress', 'review', 'done');
 CREATE TYPE user_role_enum AS ENUM ('admin', 'project_manager', 'team_leader', 'worker', 'user');
 CREATE TYPE project_status_enum AS ENUM ('active', 'completed');
+CREATE TYPE notification_type_enum AS ENUM ('assignment', 'deadline');
 
 -- Table: Users
 CREATE TABLE Users (
@@ -116,4 +119,24 @@ CREATE TABLE TaskAttachments (
     fileSize      INTEGER,                     -- bytes
     mimeType      VARCHAR(100),
     uploadedAt    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Table: TaskComments
+CREATE TABLE TaskComments (
+    taskCommentId SERIAL PRIMARY KEY,
+    taskId INTEGER REFERENCES Tasks(taskId) ON DELETE CASCADE,
+    userId INTEGER REFERENCES Users(userId) ON DELETE SET NULL, -- เพื่อเก็บว่าใครเป็นคนคอมเมนต์
+    comment TEXT NOT NULL,
+    createdDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Table: Notifications
+CREATE TABLE Notifications (
+    notificationId SERIAL PRIMARY KEY,
+    userId INTEGER REFERENCES Users(userId) ON DELETE CASCADE,
+    taskId INTEGER REFERENCES Tasks(taskId) ON DELETE CASCADE,
+    type notification_type_enum NOT NULL, -- เปลี่ยนมาใช้ ENUM แทน VARCHAR
+    message TEXT NOT NULL,
+    isRead BOOLEAN DEFAULT FALSE,
+    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

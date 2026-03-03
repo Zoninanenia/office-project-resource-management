@@ -88,3 +88,12 @@ export interface TaskWorker {
     workerId: number;
     assignedAt: string;
 }
+
+export interface AppNotification {
+    notificationId: number;
+    taskId: number;
+    type: 'assignment' | 'deadline';
+    message: string;
+    isRead: boolean;
+    createdAt: string;
+}

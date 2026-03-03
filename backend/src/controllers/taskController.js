@@ -125,9 +125,17 @@ exports.createTask = async (req, res) => {
         // Assign to workers if provided (Array of IDs)
         if (assignedTo && Array.isArray(assignedTo) && assignedTo.length > 0) {
             for (const workerId of assignedTo) {
+                // 1. นำ User เข้า Task
                 await client.query(
                     'INSERT INTO TasksToWorkers (taskId, workerId) VALUES ($1, $2)',
                     [taskId, workerId]
+                );
+
+                // 2. สร้างการแจ้งเตือน (เพิ่มใหม่)
+                const message = `You have been assigned to a new task: ${taskName}`;
+                await client.query(
+                    `INSERT INTO Notifications (userId, taskId, type, message) VALUES ($1, $2, $3, $4)`,
+                    [workerId, taskId, 'assignment', message]
                 );
             }
         }
@@ -356,5 +364,115 @@ exports.deleteAttachment = async (req, res) => {
     } catch (err) {
         console.error('Delete Attachment Error:', err.message);
         res.status(500).json({ error: err.message });
+    }
+};
+
+// Get all comments for a task
+exports.getTaskComments = async (req, res) => {
+    const { taskId } = req.params;
+
+    try {
+        const result = await pool.query(
+            `SELECT c.taskCommentId as "taskCommentId", c.comment, c.createdDate as "createdDate",
+                    u.userId as "userId", u.username as "username", u.profilePic as "profilePic"
+             FROM TaskComments c
+             LEFT JOIN Users u ON c.userId = u.userId
+             WHERE c.taskId = $1
+             ORDER BY c.createdDate ASC`,
+            [taskId]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Get Task Comments Error:', err.message);
+        res.status(500).json({ error: 'Server Error' });
+    }
+};
+
+// Add a comment to a task
+exports.addTaskComment = async (req, res) => {
+    const { taskId } = req.params;
+    const { comment } = req.body;
+    const userId = req.user.userId; // ดึงมาจาก authMiddleware
+
+    if (!comment || comment.trim() === '') {
+        return res.status(400).json({ message: 'Comment text is required' });
+    }
+
+    try {
+        const result = await pool.query(
+            `INSERT INTO TaskComments (taskId, userId, comment) 
+             VALUES ($1, $2, $3) 
+             RETURNING taskCommentId as "taskCommentId", comment, createdDate as "createdDate"`,
+            [taskId, userId, comment]
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error('Add Task Comment Error:', err.message);
+        res.status(500).json({ error: 'Server Error' });
+    }
+};
+
+// Update a task comment
+exports.updateTaskComment = async (req, res) => {
+    const { commentId } = req.params;
+    const { comment } = req.body;
+    const userId = req.user.userId;
+
+    try {
+        // เช็คก่อนว่ามีสิทธิ์แก้ไหม (ต้องเป็นเจ้าของคอมเมนต์)
+        const checkOwnership = await pool.query(
+            'SELECT userId FROM TaskComments WHERE taskCommentId = $1',
+            [commentId]
+        );
+
+        if (checkOwnership.rows.length === 0) {
+            return res.status(404).json({ message: 'Comment not found' });
+        }
+
+        if (checkOwnership.rows[0].userid !== userId) {
+            return res.status(403).json({ message: 'Unauthorized to edit this comment' });
+        }
+
+        const result = await pool.query(
+            `UPDATE TaskComments 
+             SET comment = $1 
+             WHERE taskCommentId = $2 
+             RETURNING taskCommentId as "taskCommentId", comment, createdDate as "createdDate"`,
+            [comment, commentId]
+        );
+
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Update Task Comment Error:', err.message);
+        res.status(500).json({ error: 'Server Error' });
+    }
+};
+
+// Delete a task comment
+exports.deleteTaskComment = async (req, res) => {
+    const { commentId } = req.params;
+    const userId = req.user.userId;
+    const userRole = req.user.role;
+
+    try {
+        const checkOwnership = await pool.query(
+            'SELECT userId FROM TaskComments WHERE taskCommentId = $1',
+            [commentId]
+        );
+
+        if (checkOwnership.rows.length === 0) {
+            return res.status(404).json({ message: 'Comment not found' });
+        }
+
+        // ให้ลบได้เฉพาะเจ้าของคอมเมนต์ หรือคนที่เป็น PM
+        if (checkOwnership.rows[0].userid !== userId && userRole !== 'project_manager') {
+            return res.status(403).json({ message: 'Unauthorized to delete this comment' });
+        }
+
+        await pool.query('DELETE FROM TaskComments WHERE taskCommentId = $1', [commentId]);
+        res.json({ message: 'Comment deleted successfully' });
+    } catch (err) {
+        console.error('Delete Task Comment Error:', err.message);
+        res.status(500).json({ error: 'Server Error' });
     }
 };
