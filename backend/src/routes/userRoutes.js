@@ -15,4 +15,7 @@ router.put('/:id/role', verifyToken, checkRole(['admin']), userController.update
 // reset Password - All 
 router.put('/:id/newpassword', verifyToken, userController.updatePassword);
 
+// Update Name - All
+router.put('/:id/changename', verifyToken, userController.updateName);
+
 module.exports = router;

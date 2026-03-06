@@ -101,3 +101,22 @@ exports.updatePassword = async (req, res) => {
         res.status(500).send('Server Error');
     }
 };
+
+// update Firstname, Lastname 
+exports.updateName = async (req, res) => {
+    const { id } = req.params;
+    const { firstName, lastName } = req.body;
+    try {
+        const query = `
+            UPDATE Users 
+            SET "firstname" = COALESCE($1, "firstname"), 
+                "lastname"  = COALESCE($2, "lastname") 
+            WHERE "userid" = $3 
+            RETURNING *`;
+        const result = await pool.query(query, [firstName || null, lastName || null, id]);
+        res.json(result.rows[0]);
+    } catch(err){
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+};
