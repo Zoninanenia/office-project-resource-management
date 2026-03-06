@@ -62,6 +62,7 @@ export default function RegisterPage() {
                             <label className="block text-gray-700 text-sm font-bold mb-2 ml-1" htmlFor="firstName">First Name</label>
                             <input
                                 type="text"
+                                placeholder="First Name"
                                 id="firstName"
                                 value={formData.firstName}
                                 onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
@@ -73,6 +74,7 @@ export default function RegisterPage() {
                             <label className="block text-gray-700 text-sm font-bold mb-2 ml-1" htmlFor="lastName">Last Name</label>
                             <input
                                 type="text"
+                                placeholder="Last Name"
                                 id="lastName"
                                 value={formData.lastName}
                                 onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
@@ -86,6 +88,7 @@ export default function RegisterPage() {
                         <label className="block text-gray-700 text-sm font-bold mb-2 ml-1" htmlFor="username">Username</label>
                         <input
                             type="text"
+                            placeholder="Username"
                             id="username"
                             value={formData.username}
                             onChange={(e) => setFormData({ ...formData, username: e.target.value })}
@@ -98,6 +101,7 @@ export default function RegisterPage() {
                         <label className="block text-gray-700 text-sm font-bold mb-2 ml-1" htmlFor="email">Email</label>
                         <input
                             type="email"
+                            placeholder="Email"
                             id="email"
                             value={formData.email}
                             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -110,6 +114,7 @@ export default function RegisterPage() {
                         <label className="block text-gray-700 text-sm font-bold mb-2 ml-1" htmlFor="password">Password</label>
                         <input
                             type="password"
+                            placeholder="Password"
                             id="password"
                             value={formData.password}
                             onChange={(e) => setFormData({ ...formData, password: e.target.value })}

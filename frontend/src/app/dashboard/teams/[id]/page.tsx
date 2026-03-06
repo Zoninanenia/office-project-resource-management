@@ -150,6 +150,26 @@ export default function TeamDetailsPage() {
 
     const handleSaveTask = async (e: React.FormEvent) => {
         e.preventDefault();
+        console.log(newTask.projectId);
+        
+        if (!newTask.taskName || !newTask.taskName.trim()) {
+            alertError("Incomplete Form", { message: "Please enter a task name."});
+            // alert("Please enter a task name");
+            return;
+        }
+
+        // if (!newTask.description || !newTask.description.trim()) {
+        //     alertError("Incomplete Form", { message: "Please enter a description."});
+        //     // alert("Please enter a description");
+        //     return;
+        // }
+
+        if (!newTask.dueDate) {
+            alertError("Incomplete Form", { message: "Please select a due date."});
+            // alert("Please select a due date");
+            return;
+        }
+
         try {
             if (isEditingTask && editingTaskId) {
                 await api.put(`/tasks/${editingTaskId}`, newTask);
