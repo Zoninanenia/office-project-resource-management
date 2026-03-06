@@ -50,6 +50,7 @@ export default function ProjectTasksPage() {
                 const data = await api.get<Task[]>(`/tasks/project/${projectId}`);
                 setTasks(data);
             } catch (err: any) {
+                console.error(err.message);
                 setError(err.message || 'Failed to fetch tasks');
             } finally {
                 setLoading(false);
@@ -133,7 +134,8 @@ export default function ProjectTasksPage() {
                 teamId: '',
             });
         } catch (err: any) {
-            alertError("Something Went Wrong", { message: err.message || "Failed to process task."});
+            alertError("Something Went Wrong", { message: "Failed to process task."});
+            console.error(err.message);
             // alert(err.message || 'Failed to process task');
         }
     };
@@ -145,7 +147,8 @@ export default function ProjectTasksPage() {
                 const data = await api.get<Task[]>(`/tasks/project/${projectId}`);
                 setTasks(data);
             } catch (err: any) {
-                alertError("Something Went Wrong", { message: err.message || "Failed to delete task."});
+                alertError("Something Went Wrong", { message: "Failed to delete task."});
+                console.error(err.message);
                 // alert(err.message || 'Failed to delete task');
             }
         }

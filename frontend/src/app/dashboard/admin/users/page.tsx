@@ -31,7 +31,8 @@ export default function UserManagementPage() {
             const data = await api.get<User[]>('/users');
             setUsers(data);
         } catch (err: any) {
-            alertError("Something Went Wrong", { message: err.message || "Failed to fetch users."});
+            alertError("Something Went Wrong", { message: "Failed to fetch users."});
+            console.log(err.message);
             // setError(err.message || 'Failed to fetch users');
         } finally {
             setLoading(false);
@@ -52,7 +53,8 @@ export default function UserManagementPage() {
             await api.put(`/users/${userId}/role`, { role: newRole });
             setUsers(users.map(u => u.userId === userId ? { ...u, role: newRole } : u));
         } catch (err: any) {
-            alertError("Something Went Wrong", { message: err.message || "Failed to update role."});
+            alertError("Something Went Wrong", { message: "Failed to update role."});
+            console.log(err.message);
             // alert(err.message || 'Failed to update role');
         }
     };

@@ -83,6 +83,7 @@ export default function TeamDetailsPage() {
                 setTasks(teamTasks);
 
             } catch (err: any) {
+                console.error(err.message);
                 setError(err.message || 'Failed to fetch team details');
             } finally {
                 setLoading(false);
@@ -158,7 +159,8 @@ export default function TeamDetailsPage() {
             setShowTaskModal(false);
             handleTaskUpdated();
         } catch (err: any) {
-            alertError("Something Went Wrong", { message: err.message || "Failed to save task."});
+            alertError("Something Went Wrong", { message: "Failed to save task."});
+            console.error(err.message);
             // alert(err.message || 'Failed to save task');
         }
     };

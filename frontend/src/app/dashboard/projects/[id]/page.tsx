@@ -103,6 +103,7 @@ export default function ProjectDetailPage() {
             // Show some success feedback? The UI update should be enough for now.
         } catch (err: any) {
             alertError("Something Went Wrong", { message: "Failed to mark project as completed."});
+            console.error(err.message);
             // alert(err.message || 'Failed to mark project as completed');
         }
     };
@@ -175,7 +176,8 @@ export default function ProjectDetailPage() {
             setTasks(tasksData.filter(t => t.projectId === projectId));
             setNewTask({ taskName: '', description: '', status: 'todo', dueDate: '', estimatedHours: '', assignedTo: [], dependencies: [], teamId: '' });
         } catch (err: any) {
-            alertError("Something Went Wrong", { message: err.message || "Failed to process task."});
+            alertError("Something Went Wrong", { message: "Failed to process task."});
+            console.error(err.message);
             // alert(err.message || 'Failed to process task');
         }
     };
@@ -187,7 +189,8 @@ export default function ProjectDetailPage() {
                 const tasksData = await api.get<Task[]>('/tasks');
                 setTasks(tasksData.filter(t => t.projectId === projectId));
             } catch (err: any) {
-                alertError("Something Went Wrong", { message: err.message || "Failed to delete task."});
+                alertError("Something Went Wrong", { message: "Failed to delete task."});
+                console.error(err.message);
                 // alert(err.message || 'Failed to delete task');
             }
         }
@@ -283,7 +286,8 @@ export default function ProjectDetailPage() {
             ));
         } catch (err: any) {
             console.error('Failed to update dependencies', err);
-            alertError("Something Went Wrong", { message: err.message || "Failed to update dependencies."});
+            alertError("Something Went Wrong", { message: "Failed to update dependencies."});
+            console.error(err.message);
             // alert(err.message || 'Failed to update dependencies');
         } finally {
             setSavingDep(false);

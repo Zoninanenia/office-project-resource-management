@@ -123,7 +123,8 @@ export default function WagesPage() {
                 setLabourData(data);
             }
         } catch (err: any) {
-            alertError("Something Went Wrong", { message: err.message || "Failed to update wage."});
+            alertError("Something Went Wrong", { message: "Failed to update wage."});
+            console.error(err.message);
             // alert(err.message || 'Failed to update wage');
         } finally {
             setSavingWage(null);

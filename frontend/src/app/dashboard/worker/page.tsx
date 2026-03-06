@@ -119,6 +119,7 @@ export default function WorkerPage() {
                 setTasks(dashboardTasks);
             } catch (err: unknown) {
                 if (err instanceof Error) {
+                    console.error(err.message);
                     setError(err.message);
                 } else {
                     setError('Failed to load worker dashboard');

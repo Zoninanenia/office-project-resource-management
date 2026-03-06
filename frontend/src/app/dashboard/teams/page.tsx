@@ -155,7 +155,8 @@ export default function TeamsPage() {
                 await fetchTeams(); // Refresh to see new team immediately behind modal
             }
         } catch (err: any) {
-            alertError("Something Went Wrong", { message: err.message || "Failed to process team."});
+            alertError("Something Went Wrong", { message: "Failed to process team."});
+            console.error(err.message);
             // alert(err.message || 'Failed to process team');
         } finally {
             setIsSubmitting(false);
@@ -178,7 +179,8 @@ export default function TeamsPage() {
                 setStep(3);
             }
         } catch (err: any) {
-            alertError("Something Went Wrong", { message: err.message || "Failed to assign leader."});
+            alertError("Something Went Wrong", { message: "Failed to assign leader."});
+            console.error(err.message);
             // alert(err.message || 'Failed to assign leader');
         } finally {
             setIsSubmitting(false);
@@ -215,7 +217,8 @@ export default function TeamsPage() {
             alertSuccess(isEditing ? "Team Updated" : "Team Created", { message: `Setup complete!` });
             // alert(`Team ${isEditing ? 'updated' : 'setup'} complete!`);
         } catch (err: any) {
-            alertError("Something Went Wrong", { message: err.message || "Failed to complete team setup."});
+            alertError("Something Went Wrong", { message: "Failed to complete team setup."});
+            console.error(err.message);
             // alert(err.message || 'Failed to complete team setup');
         } finally {
             setIsSubmitting(false);
@@ -277,7 +280,8 @@ export default function TeamsPage() {
                 await api.delete(`/teams/${teamId}`);
                 await fetchTeams();
             } catch (err: any) {
-                alertError("Something Went Wrong", { message: err.message || "Failed to delete team."});
+                alertError("Something Went Wrong", { message: "Failed to delete team."});
+                console.error(err.message);
                 // alert(err.message || 'Failed to delete team');
             }
         }
@@ -304,7 +308,8 @@ export default function TeamsPage() {
             // alert('Member added successfully!');
         } catch (err: any) {
             console.error(err);
-            alertError("Something Went Wrong", { message: err.message || "Failed to add member."});
+            alertError("Something Went Wrong", { message: "Failed to add member."});
+            console.error(err.message);
             // alert(err.message || 'Failed to add member');
         } finally {
             setIsSubmitting(false);
