@@ -84,6 +84,7 @@ export default function ForgotPasswordPage() {
             setError("");
         } catch (err: any) {
             setError("User not found with this email address."); 
+            return;
         } finally {
             setIsSubmitting(false);
         }
@@ -112,6 +113,7 @@ export default function ForgotPasswordPage() {
                 setError("");
             } catch (err: any) {
                 setError('Invalid OTP code.');
+                return;
             } finally {
                 setIsSubmitting(false);
             }
@@ -151,6 +153,7 @@ export default function ForgotPasswordPage() {
             router.push('/login');
         } catch (err: any) {
             setError('Failed to complete.');
+            return;
         } finally {
             setIsSubmitting(false);
         }

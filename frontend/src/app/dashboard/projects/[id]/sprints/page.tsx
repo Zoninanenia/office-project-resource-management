@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 import { Sprint, Task } from '@/types';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { alertSuccess, alertError } from '@/components/Alertmodal';
 
 export default function SprintsPage() {
     const params = useParams();
@@ -98,7 +99,8 @@ export default function SprintsPage() {
             setEditingSprint(null);
             setForm({ sprintName: '', startDate: '', endDate: '' });
         } catch (err: any) {
-            alert(err.message || 'Failed to save sprint');
+            alertError("Something Went Wrong", { message: err.message || "Failed to save sprint."});
+            // alert( err.message || 'Failed to save sprint');
         }
     };
 
@@ -113,7 +115,8 @@ export default function SprintsPage() {
             setSprints(sprintsData);
             setTasks(tasksData.filter(t => t.projectId === projectId));
         } catch (err: any) {
-            alert(err.message || 'Failed to delete sprint');
+            alertError("Something Went Wrong", { message: err.message || "Failed to delete sprint."});
+            // alert(err.message || 'Failed to delete sprint');
         }
     };
 
@@ -124,7 +127,8 @@ export default function SprintsPage() {
                 s.sprintId === sprintId ? { ...s, status: newStatus as Sprint['status'] } : s
             ));
         } catch (err: any) {
-            alert(err.message || 'Failed to update status');
+            alertError("Something Went Wrong", { message: err.message || "Failed to update status."});
+            // alert(err.message || 'Failed to update status');
         }
     };
 
@@ -139,7 +143,8 @@ export default function SprintsPage() {
             const sprintsData = await api.get<Sprint[]>(`/sprints/project/${projectId}`);
             setSprints(sprintsData);
         } catch (err: any) {
-            alert(err.message || 'Failed to assign task');
+            alertError("Something Went Wrong", { message: err.message || "Failed to assign task."});
+            // alert(err.message || 'Failed to assign task');
         }
     };
 
@@ -151,7 +156,8 @@ export default function SprintsPage() {
             const sprintsData = await api.get<Sprint[]>(`/sprints/project/${projectId}`);
             setSprints(sprintsData);
         } catch (err: any) {
-            alert(err.message || 'Failed to remove task from sprint');
+            alertError("Something Went Wrong", { message: err.message || "Failed to remove task from sprint."});
+            // alert(err.message || 'Failed to remove task from sprint');
         }
     };
 
@@ -176,7 +182,8 @@ export default function SprintsPage() {
         if (!carryOverFromId || !carryOverToId) return;
         try {
             const result: any = await api.post(`/sprints/${carryOverFromId}/carry-over`, { toSprintId: carryOverToId });
-            alert(result.message || 'Tasks carried over successfully');
+            alertSuccess("Saved Successfully", { message: result.message || "Tasks carried over successfully." });
+            // alert(result.message || 'Tasks carried over successfully');
             // Refresh data
             const [sprintsData, tasksData] = await Promise.all([
                 api.get<Sprint[]>(`/sprints/project/${projectId}`),
@@ -188,7 +195,8 @@ export default function SprintsPage() {
             setCarryOverFromId(null);
             setCarryOverToId(null);
         } catch (err: any) {
-            alert(err.message || 'Failed to carry over tasks');
+            alertError("Something Went Wrong", { message: err.message || "Failed to carry over tasks."});
+            // alert(err.message || 'Failed to carry over tasks');
         }
     };
 
@@ -203,7 +211,8 @@ export default function SprintsPage() {
             setTasks(tasksData.filter(t => t.projectId === projectId));
             setMovingTaskId(null);
         } catch (err: any) {
-            alert(err.message || 'Failed to move task');
+            alertError("Something Went Wrong", { message: err.message || "Failed to move task."});
+            // alert(err.message || 'Failed to move task');
         }
     };
 

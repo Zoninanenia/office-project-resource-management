@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 import { User, UserRole } from '@/types';
 import { SearchBar } from '@/components/SearchBar';
 import { StatusBadge } from '@/components/StatusBadge';
+import { alertError } from '@/components/Alertmodal';
 
 export default function UserManagementPage() {
     const [users, setUsers] = useState<User[]>([]);
@@ -13,6 +14,7 @@ export default function UserManagementPage() {
     const [search, setSearch] = useState('');
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+    const [showPass, setShowPass] = useState(false);
 
     // New User Form State
     const [newUser, setNewUser] = useState({
@@ -29,7 +31,8 @@ export default function UserManagementPage() {
             const data = await api.get<User[]>('/users');
             setUsers(data);
         } catch (err: any) {
-            setError(err.message || 'Failed to fetch users');
+            alertError("Something Went Wrong", { message: err.message || "Failed to fetch users."});
+            // setError(err.message || 'Failed to fetch users');
         } finally {
             setLoading(false);
         }
@@ -49,12 +52,56 @@ export default function UserManagementPage() {
             await api.put(`/users/${userId}/role`, { role: newRole });
             setUsers(users.map(u => u.userId === userId ? { ...u, role: newRole } : u));
         } catch (err: any) {
-            alert(err.message || 'Failed to update role');
+            alertError("Something Went Wrong", { message: err.message || "Failed to update role."});
+            // alert(err.message || 'Failed to update role');
         }
     };
 
     const handleCreateUser = async (e: React.FormEvent) => {
         e.preventDefault();
+        const nameRegex = /^[\p{L}\s]+$/u;
+        if (newUser.firstName && !nameRegex.test(newUser.firstName)) {
+            alertError("Incomplete Form", { message: "First name: Only letters are allowed."});
+            return;
+        }
+        if (newUser.lastName && !nameRegex.test(newUser.lastName)) {
+            alertError("Incomplete Form", { message: "Last name: Only letters are allowed."});
+            return;
+        }
+        if (!newUser.firstName && !newUser.lastName) {
+            alertError("Incomplete Form", { message: "Please fill in at least one field."});
+            return;
+        }
+
+        if (newUser.password.trim().length === 0) {
+            alertError("Invalid Password", { message: "Password cannot be empty."});
+            return;
+        }
+
+        if (newUser.password.length < 8) {
+            alertError("Invalid Password", { message: "Password must be at least 8 characters."});
+            return;
+        }
+        if (newUser.password.length > 50) {
+            alertError("Invalid Password", { message: "Password must not exceed 50 characters."});
+            return;
+        }
+        const alphanumericRegex = /^[a-zA-Z0-9]+$/; // เฉพาะภาษาอังกฤษ (A-Z, a-z) และตัวเลข (0-9)
+        if (!alphanumericRegex.test(newUser.password)) {
+            alertError("Invalid Password", { message: "Password can only contain English letters and numbers."});
+            return;
+        }
+
+        if (!newUser.email.trim()) {
+            alertError("Incomplete Form", { message: "Please enter an email address." });
+            return;
+        }
+
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newUser.email)) {
+            alertError("Invalid Email", { message: "Please enter a valid email address." });
+            return;
+        }
+
         try {
             await api.post('/users', newUser);
             setShowCreateModal(false);
@@ -68,7 +115,8 @@ export default function UserManagementPage() {
                 role: 'user',
             });
         } catch (err: any) {
-            alert(err.message || 'Failed to create user');
+            alertError("Something Went Wrong", { message: err.message || "Failed to create user."});
+            // alert(err.message || 'Failed to create user');
         }
     };
 
@@ -197,14 +245,41 @@ export default function UserManagementPage() {
                                         className="w-full p-3 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-brand-cyan rounded-xl font-medium outline-none transition-all dark:text-white"
                                         required
                                     />
-                                    <input
+                                    {/* <input
                                         type="password"
                                         placeholder="Password"
                                         value={newUser.password}
                                         onChange={e => setNewUser({ ...newUser, password: e.target.value })}
                                         className="w-full p-3 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-brand-cyan rounded-xl font-medium outline-none transition-all dark:text-white"
                                         required
-                                    />
+                                    /> */}
+                                    <div className="relative">
+                                        <input
+                                            type={showPass ? "text" : "password"}
+                                            value={newUser.password}
+                                            onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                                            placeholder="Password"
+                                            required
+                                            className="w-full p-3 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-brand-cyan rounded-xl font-medium outline-none transition-all dark:text-white"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPass(!showPass)}
+                                            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#a09c96] hover:text-[#5a5650] transition-colors"
+                                        >
+                                            {showPass ? (
+                                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+                                            </svg>
+                                            ) : (
+                                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                                                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                                                <line x1="1" y1="1" x2="23" y2="23" />
+                                            </svg>
+                                            )}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 

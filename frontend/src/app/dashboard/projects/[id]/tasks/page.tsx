@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { Task, User } from '@/types';
+import { alertSuccess, alertError } from '@/components/Alertmodal';
 
 interface TeamInfo {
     teamId: number;
@@ -110,6 +111,7 @@ export default function ProjectTasksPage() {
 
     const handleCreateTask = async (e: React.FormEvent) => {
         e.preventDefault();
+        
         try {
             if (isEditing && editingTaskId) {
                 await api.put(`/tasks/${editingTaskId}`, newTask);
@@ -131,7 +133,8 @@ export default function ProjectTasksPage() {
                 teamId: '',
             });
         } catch (err: any) {
-            alert(err.message || 'Failed to process task');
+            alertError("Something Went Wrong", { message: err.message || "Failed to process task."});
+            // alert(err.message || 'Failed to process task');
         }
     };
 
@@ -142,7 +145,8 @@ export default function ProjectTasksPage() {
                 const data = await api.get<Task[]>(`/tasks/project/${projectId}`);
                 setTasks(data);
             } catch (err: any) {
-                alert(err.message || 'Failed to delete task');
+                alertError("Something Went Wrong", { message: err.message || "Failed to delete task."});
+                // alert(err.message || 'Failed to delete task');
             }
         }
     };

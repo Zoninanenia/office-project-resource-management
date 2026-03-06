@@ -6,6 +6,8 @@ import { useEffect, useState, useRef } from 'react';
 import { ProjectProvider, useProject } from './ProjectContext';
 import { api } from '@/lib/api';
 import { AppNotification } from '@/types';
+import { AlertModalProvider } from '@/components/Alertmodal';
+
 
 export default function DashboardLayout({
   children,
@@ -353,12 +355,14 @@ export default function DashboardLayout({
           </header>
 
           {/* Page Content */}
-          <main
-              className="flex-1 p-6 md:p-8 lg:p-10 overflow-y-auto bg-linear-to-br from-blue-50/50 via-white to-cyan-50/30 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 transition-colors duration-300">
-            <div className="max-w-7xl mx-auto">
-              {children}
-            </div>
-          </main>
+            <main
+                className="flex-1 p-6 md:p-8 lg:p-10 overflow-y-auto bg-linear-to-br from-blue-50/50 via-white to-cyan-50/30 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 transition-colors duration-300">
+              <div className="max-w-7xl mx-auto">
+                <AlertModalProvider>
+                  {children}
+                </AlertModalProvider>
+              </div>
+            </main>
         </div>
       </ProjectProvider>
     </div>

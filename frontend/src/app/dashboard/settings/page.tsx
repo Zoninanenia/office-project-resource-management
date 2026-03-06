@@ -1,6 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
+import { alertSuccess, alertError } from '@/components/Alertmodal';
+import { useRouter } from "next/navigation";
 
 
 function SecurityIcon({ className }: { className?: string }) {
@@ -22,6 +24,7 @@ function ProfileIcon({ className }: { className?: string }) {
 }
 
 export default function SettingsPage() {
+    const router = useRouter();
     const [userRole, setUserRole] = useState<string | null>(null);
     const [userFirstName, setUserFirstName] = useState<string | null>(null);
     const [userLastName, setUserLastName] = useState<string | null>(null);
@@ -36,7 +39,7 @@ export default function SettingsPage() {
     const [showPass, setShowPass] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
 
-    useEffect(() => {
+    const loadUserData = () => {
         const userStr = localStorage.getItem('user');
         if (userStr) {
             const user = JSON.parse(userStr);
@@ -46,21 +49,28 @@ export default function SettingsPage() {
             setUserLastName(user.lastname);
             setUserEmail(user.email);
         }
+    };
+
+    useEffect(() => {
+        loadUserData();
     }, []);
 
     const handleNameSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const nameRegex = /^[\p{L}\s]+$/u;
         if (firstName && !nameRegex.test(firstName)) {
-            alert("First name: Only letters are allowed.");
+            alertError("Incomplete Form", { message: "First name: Only letters are allowed."});
+            // alert("First name: Only letters are allowed.");
             return;
         }
         if (lastName && !nameRegex.test(lastName)) {
-            alert("Last name: Only letters are allowed.");
+            alertError("Incomplete Form", { message: "Last name: Only letters are allowed."});
+            // alert("Last name: Only letters are allowed.");
             return;
         }
         if (!firstName && !lastName) {
-            alert("Please fill in at least one field.");
+            alertError("Incomplete Form", { message: "Please fill in at least one field."});
+            // alert("Please fill in at least one field.");
             return;
         }
         try {
@@ -72,52 +82,66 @@ export default function SettingsPage() {
                 user.lastname = lastName || user.lastname;
                 localStorage.setItem('user', JSON.stringify(user));
             }
-            // alert('updated successfully');
             setFirstName("");
             setLastName("");
-            window.location.reload();
+            loadUserData();
+            alertSuccess("Saved Successfully", { message: "Changes have been saved." });
+
+            // window.location.reload();
         }catch (err) {
-            alert('Failed to update');
+            alertError("Something Went Wrong", { message: "Failed to update." });
+            // alert('Failed to update');
         }
     };
 
     const handlePassSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (password.trim().length === 0) {
-            alert('Password cannot be empty');
+            alertError("Invalid Password", { message: "Password cannot be empty."});
+            // alert('Password cannot be empty');
             return;
         }
         if (confirmPassword.trim().length === 0) {
-            alert('confirmPassword cannot be empty');
+            alertError("Invalid Password", { message: "confirmPassword cannot be empty."});
+            // alert('confirmPassword cannot be empty');
             return;
         }
 
         if (password !== confirmPassword) {
-            alert("Passwords do not match");
+            alertError("Invalid Password", { message: "Passwords do not match."});
+            // alert("Passwords do not match");
             return;
         }
         if (password.length < 8) {
-            alert("Password must be at least 8 characters");
+            alertError("Invalid Password", { message: "Password must be at least 8 characters."});
+            // alert("Password must be at least 8 characters");
             return;
         }
         if (password.length > 50) {
-            alert("Password must not exceed 50 characters");
+            alertError("Invalid Password", { message: "Password must not exceed 50 characters."});
+            // alert("Password must not exceed 50 characters");
             return;
         }
         const alphanumericRegex = /^[a-zA-Z0-9]+$/; // เฉพาะภาษาอังกฤษ (A-Z, a-z) และตัวเลข (0-9)
         if (!alphanumericRegex.test(password)) {
-            alert("Password can only contain English letters and numbers");
+            alertError("Invalid Password", { message: "Password can only contain English letters and numbers."});
+            // alert("Password can only contain English letters and numbers");
             return;
         }
         try {
             await api.put(`/users/${userId}/newpassword/`, { password });
-            alert('Password updated successfully');
+            // alert('Password updated successfully');
+            alertSuccess("Saved Successfully", { message: "Changes have been saved." });
             setPassword("");
             setConfirmPassword("");
         }catch (err) {
-            alert('Failed to update password');
+            alertError("Something Went Wrong", { message: "Failed to update password."});
+            // alert('Failed to update password');
         }
     };
+
+
+    
 
     return (
         <div>
@@ -236,31 +260,31 @@ export default function SettingsPage() {
                             <div className="flex flex-col gap-1.5">
                                 <label className="text-[11px] font-medium uppercase tracking-wide">New Password</label>
                                 <div className="relative">
-                                <input
-                                    type={showPass ? "text" : "password"}
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    placeholder="Enter new password"
-                                    required
-                                    className="w-full pl-4 pr-12 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl text-sm outline-none focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 dark:text-white transition-all"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPass(!showPass)}
-                                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#a09c96] hover:text-[#5a5650] transition-colors"
-                                >
-                                    {showPass ? (
-                                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
-                                    </svg>
-                                    ) : (
-                                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-                                        <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-                                        <line x1="1" y1="1" x2="23" y2="23" />
-                                    </svg>
-                                    )}
-                                </button>
+                                    <input
+                                        type={showPass ? "text" : "password"}
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        placeholder="Enter new password"
+                                        required
+                                        className="w-full pl-4 pr-12 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl text-sm outline-none focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 dark:text-white transition-all"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPass(!showPass)}
+                                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#a09c96] hover:text-[#5a5650] transition-colors"
+                                    >
+                                        {showPass ? (
+                                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+                                        </svg>
+                                        ) : (
+                                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                                            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                                            <line x1="1" y1="1" x2="23" y2="23" />
+                                        </svg>
+                                        )}
+                                    </button>
                                 </div>
 
                                 {/* Strength Bar */}

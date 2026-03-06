@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Project } from '@/types';
 import { Avatar } from '@/components/Avatar';
+import { alertError } from '@/components/Alertmodal';
 
 interface WorkerWage {
     userId: number;
@@ -100,7 +101,8 @@ export default function WagesPage() {
 
         const numValue = parseFloat(value);
         if (isNaN(numValue) || numValue < 0) {
-            alert('Please enter a valid non-negative number');
+            alertError("Incomplete Form", { message: "Please enter a valid non-negative number."});
+            // alert('Please enter a valid non-negative number');
             return;
         }
 
@@ -121,7 +123,8 @@ export default function WagesPage() {
                 setLabourData(data);
             }
         } catch (err: any) {
-            alert(err.message || 'Failed to update wage');
+            alertError("Something Went Wrong", { message: err.message || "Failed to update wage."});
+            // alert(err.message || 'Failed to update wage');
         } finally {
             setSavingWage(null);
         }

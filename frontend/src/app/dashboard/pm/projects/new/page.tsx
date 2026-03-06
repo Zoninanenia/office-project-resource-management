@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { alertError } from '@/components/Alertmodal';
 
 export default function NewProjectPage() {
     const router = useRouter();
@@ -18,6 +19,31 @@ export default function NewProjectPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!project.title.trim()) {
+            alertError("Incomplete Form", { message: "Please enter a project title." });
+            return;
+        }
+
+        if (!project.description.trim()) {
+            alertError("Incomplete Form", { message: "Please enter a project description." });
+            return;
+        }
+
+        if (!project.startDate || !project.endDate) {
+            alertError("Incomplete Form", { message: "Please select both start and end date." });
+            return;
+        }
+
+        if (project.endDate < project.startDate) {
+            alertError("Invalid Date", { message: "End date must be after start date." });
+            return;
+        }
+
+        if (!project.budget || isNaN(Number(project.budget)) || Number(project.budget) <= 0) {
+            alertError("Incomplete Form", { message: "Please enter a valid budget." });
+            return;
+        }
+
         setIsSubmitting(true);
 
         try {
@@ -27,7 +53,8 @@ export default function NewProjectPage() {
             });
             router.push('/dashboard/projects');
         } catch (err: any) {
-            alert(err.message || 'Failed to create project');
+            alertError("Something Went Wrong", { message: err.message || "Failed to create project."});
+            // alert(err.message || 'Failed to create project');
         } finally {
             setIsSubmitting(false);
         }

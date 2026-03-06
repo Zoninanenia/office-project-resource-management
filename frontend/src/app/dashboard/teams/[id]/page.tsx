@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/PageHeader';
 import Link from 'next/link';
 import TaskModal from '@/components/TaskModal';
 import { Avatar, AvatarGroup } from '@/components/Avatar';
+import { alertError } from '@/components/Alertmodal';
 
 interface Member {
     userId: number;
@@ -157,7 +158,8 @@ export default function TeamDetailsPage() {
             setShowTaskModal(false);
             handleTaskUpdated();
         } catch (err: any) {
-            alert(err.message || 'Failed to save task');
+            alertError("Something Went Wrong", { message: err.message || "Failed to save task."});
+            // alert(err.message || 'Failed to save task');
         }
     };
 

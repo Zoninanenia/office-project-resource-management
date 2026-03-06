@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { Project, Team, Task, User } from '@/types';
 import Link from 'next/link';
 import TaskModal from '@/components/TaskModal';
+import { alertSuccess, alertError } from '@/components/Alertmodal';
 
 export default function ProjectDetailPage() {
     const params = useParams();
@@ -101,7 +102,8 @@ export default function ProjectDetailPage() {
             setProject({ ...project, status: 'completed' });
             // Show some success feedback? The UI update should be enough for now.
         } catch (err: any) {
-            alert(err.message || 'Failed to mark project as completed');
+            alertError("Something Went Wrong", { message: "Failed to mark project as completed."});
+            // alert(err.message || 'Failed to mark project as completed');
         }
     };
 
@@ -112,6 +114,7 @@ export default function ProjectDetailPage() {
                 const users = await api.get<User[]>('/users?role=worker');
                 setPotentialAssignees(users);
             } catch (err) {
+                alertError("Something Went Wrong", { message: "Failed to fetch users for assignment."});
                 console.error('Failed to fetch users for assignment', err);
             }
         }
@@ -149,8 +152,16 @@ export default function ProjectDetailPage() {
 
     const handleCreateTask = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newTask.taskName.trim()) { alert('Please enter a task name'); return; }
-        if (!newTask.dueDate) { alert('Please select a due date'); return; }
+        if (!newTask.taskName.trim()) { 
+            alertError("Incomplete Form", { message: "Please enter a task name."});
+            // alert('Please enter a task name'); 
+            return; 
+        }
+        if (!newTask.dueDate) { 
+            alertError("Incomplete Form", { message: "Please select a due date."});
+            // alert('Please select a due date'); 
+            return; 
+        }
 
         try {
             if (isEditing && editingTaskId) {
@@ -164,7 +175,8 @@ export default function ProjectDetailPage() {
             setTasks(tasksData.filter(t => t.projectId === projectId));
             setNewTask({ taskName: '', description: '', status: 'todo', dueDate: '', estimatedHours: '', assignedTo: [], dependencies: [], teamId: '' });
         } catch (err: any) {
-            alert(err.message || 'Failed to process task');
+            alertError("Something Went Wrong", { message: err.message || "Failed to process task."});
+            // alert(err.message || 'Failed to process task');
         }
     };
 
@@ -175,7 +187,8 @@ export default function ProjectDetailPage() {
                 const tasksData = await api.get<Task[]>('/tasks');
                 setTasks(tasksData.filter(t => t.projectId === projectId));
             } catch (err: any) {
-                alert(err.message || 'Failed to delete task');
+                alertError("Something Went Wrong", { message: err.message || "Failed to delete task."});
+                // alert(err.message || 'Failed to delete task');
             }
         }
     };
@@ -270,7 +283,8 @@ export default function ProjectDetailPage() {
             ));
         } catch (err: any) {
             console.error('Failed to update dependencies', err);
-            alert(err.message || 'Failed to update dependencies');
+            alertError("Something Went Wrong", { message: err.message || "Failed to update dependencies."});
+            // alert(err.message || 'Failed to update dependencies');
         } finally {
             setSavingDep(false);
             handleDragEnd();

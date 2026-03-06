@@ -37,9 +37,9 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     }, []);
 
     return (
-        <ProjectContext.Provider value={{ selectedProjectId, setSelectedProjectId, projects }}>
-            {children}
-        </ProjectContext.Provider>
+            <ProjectContext.Provider value={{ selectedProjectId, setSelectedProjectId, projects }}>
+                    {children}
+            </ProjectContext.Provider>
     );
 }
 

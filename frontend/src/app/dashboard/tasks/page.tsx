@@ -8,6 +8,8 @@ import TaskModal from '@/components/TaskModal';
 import { SearchBar } from '@/components/SearchBar';
 import { StatusBadge } from '@/components/StatusBadge';
 import { AvatarGroup } from '@/components/Avatar';
+import { alertError } from '@/components/Alertmodal';
+
 
 // Extend Task type locally if needed for extra fields from join
 interface ExtendedTask extends Task {
@@ -209,22 +211,26 @@ export default function GlobalTasksPage() {
     const handleCreateTask = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newTask.projectId) {
-            alert('Please select a project');
+            alertError("Incomplete Form", { message: "Please select a project."});
+            // alert('Please select a project');
             return;
         }
 
         if (!newTask.taskName || !newTask.taskName.trim()) {
-            alert("Please enter a task name");
+            alertError("Incomplete Form", { message: "Please enter a task name."});
+            // alert("Please enter a task name");
             return;
         }
 
-        if (!newTask.description || !newTask.description.trim()) {
-            alert("Please enter a description");
-            return;
-        }
+        // if (!newTask.description || !newTask.description.trim()) {
+        //     alertError("Incomplete Form", { message: "Please enter a description."});
+        //     // alert("Please enter a description");
+        //     return;
+        // }
 
         if (!newTask.dueDate) {
-            alert("Please select a due date");
+            alertError("Incomplete Form", { message: "Please select a due date."});
+            // alert("Please select a due date");
             return;
         }
 
@@ -259,7 +265,8 @@ export default function GlobalTasksPage() {
                 teamId: '',
             });
         } catch (err: any) {
-            alert(err.message || 'Failed to process task');
+            alertError("Something Went Wrong", { message: err.message || "Failed to process task." });
+            // alert(err.message || 'Failed to process task');
         }
     };
 
@@ -271,7 +278,8 @@ export default function GlobalTasksPage() {
                 const data = await api.get<ExtendedTask[]>('/tasks');
                 setTasks(data);
             } catch (err: any) {
-                alert(err.message || 'Failed to delete task');
+                alertError("Something Went Wrong", { message: err.message || "Failed to delete task." });
+                // alert(err.message || 'Failed to delete task');
             }
         }
     };
@@ -286,7 +294,8 @@ export default function GlobalTasksPage() {
             const data = await api.get<Attachment[]>(`/tasks/${task.taskId}/attachments`);
             setAttachments(data);
         } catch (err: any) {
-            alert(err.message || 'Failed to load attachments');
+            alertError("Something Went Wrong", { message: err.message || "Failed to load attachments." });
+            // alert(err.message || 'Failed to load attachments');
         } finally {
             setAttachmentLoading(false);
         }
@@ -314,7 +323,8 @@ export default function GlobalTasksPage() {
             const data = await api.get<Attachment[]>(`/tasks/${attachmentTask.taskId}/attachments`);
             setAttachments(data);
         } catch (err: any) {
-            alert(err.message || 'Upload failed');
+            alertError("Something Went Wrong", { message: err.message || "Upload failed." });
+            // alert(err.message || 'Upload failed');
         } finally {
             setIsUploading(false);
             e.target.value = ''; // reset input
@@ -328,7 +338,8 @@ export default function GlobalTasksPage() {
             await api.delete(`/tasks/${attachmentTask.taskId}/attachments/${attachmentId}`);
             setAttachments(prev => prev.filter(a => a.attachmentId !== attachmentId));
         } catch (err: any) {
-            alert(err.message || 'Failed to delete attachment');
+            alertError("Something Went Wrong", { message: err.message || "Failed to delete attachment." });
+            // alert(err.message || 'Failed to delete attachment');
         }
     };
 
@@ -341,7 +352,8 @@ export default function GlobalTasksPage() {
             const data = await api.get<TaskComment[]>(`/tasks/${task.taskId}/comments`);
             setComments(data);
         } catch (err: any) {
-            alert(err.message || 'Failed to load comments');
+            alertError("Something Went Wrong", { message: err.message || "Failed to load comments." });
+            // alert(err.message || 'Failed to load comments');
         } finally {
             setCommentsLoading(false);
         }
@@ -361,7 +373,8 @@ export default function GlobalTasksPage() {
             const data = await api.get<TaskComment[]>(`/tasks/${commentTask.taskId}/comments`);
             setComments(data);
         } catch (err: any) {
-            alert(err.message || 'Failed to add comment');
+            alertError("Something Went Wrong", { message: err.message || "Failed to add comment." });
+            // alert(err.message || 'Failed to add comment');
         } finally {
             setIsSubmittingComment(false);
         }
@@ -450,7 +463,8 @@ export default function GlobalTasksPage() {
             setTasks(prev => prev.map(t =>
                 t.taskId === taskId ? { ...t, status: previousStatus } : t
             ));
-            alert(err.message || 'ไม่สามารถอัปเดตสถานะงานได้');
+            alertError("Something Went Wrong", { message: err.message || "Unable to update task status." });
+            // alert(err.message || 'ไม่สามารถอัปเดตสถานะงานได้');
         }
     };
 
@@ -510,7 +524,8 @@ export default function GlobalTasksPage() {
             ));
         } catch (err: any) {
             console.error('Failed to update dependencies', err);
-            alert(err.message || 'Failed to update dependencies');
+            alertError("Something Went Wrong", { message: err.message || "Failed to update dependencies." });
+            // alert(err.message || 'Failed to update dependencies');
         } finally {
             setSavingDep(false);
         }
@@ -681,7 +696,7 @@ export default function GlobalTasksPage() {
     );
 
     return (
-        <div className="h-[calc(100vh-140px)] flex flex-col">
+         <div className="h-[calc(100vh-140px)] flex flex-col">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <div>
                     <h1 className="text-3xl font-black text-gray-800 dark:text-white tracking-tight">Active Tasks</h1>
