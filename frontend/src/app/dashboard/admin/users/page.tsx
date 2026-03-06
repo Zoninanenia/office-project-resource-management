@@ -32,7 +32,7 @@ export default function UserManagementPage() {
             setUsers(data);
         } catch (err: any) {
             alertError("Something Went Wrong", { message: "Failed to fetch users."});
-            console.log(err.message);
+            console.error(err.message);
             // setError(err.message || 'Failed to fetch users');
         } finally {
             setLoading(false);
@@ -54,7 +54,7 @@ export default function UserManagementPage() {
             setUsers(users.map(u => u.userId === userId ? { ...u, role: newRole } : u));
         } catch (err: any) {
             alertError("Something Went Wrong", { message: "Failed to update role."});
-            console.log(err.message);
+            console.error(err.message);
             // alert(err.message || 'Failed to update role');
         }
     };

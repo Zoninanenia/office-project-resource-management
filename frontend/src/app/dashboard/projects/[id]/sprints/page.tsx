@@ -100,7 +100,7 @@ export default function SprintsPage() {
             setForm({ sprintName: '', startDate: '', endDate: '' });
         } catch (err: any) {
             alertError("Something Went Wrong", { message: "Failed to save sprint."});
-            console.log(err.message);
+            console.error(err.message);
             // alert( err.message || 'Failed to save sprint');
         }
     };
@@ -117,7 +117,7 @@ export default function SprintsPage() {
             setTasks(tasksData.filter(t => t.projectId === projectId));
         } catch (err: any) {
             alertError("Something Went Wrong", { message: "Failed to delete sprint."});
-            console.log(err.message);
+            console.error(err.message);
             // alert(err.message || 'Failed to delete sprint');
         }
     };
@@ -130,7 +130,7 @@ export default function SprintsPage() {
             ));
         } catch (err: any) {
             alertError("Something Went Wrong", { message: "Failed to update status."});
-            console.log(err.message);
+            console.error(err.message);
             // alert(err.message || 'Failed to update status');
         }
     };
@@ -147,7 +147,7 @@ export default function SprintsPage() {
             setSprints(sprintsData);
         } catch (err: any) {
             alertError("Something Went Wrong", { message: "Failed to assign task."});
-            console.log(err.message);
+            console.error(err.message);
             // alert(err.message || 'Failed to assign task');
         }
     };
@@ -161,7 +161,7 @@ export default function SprintsPage() {
             setSprints(sprintsData);
         } catch (err: any) {
             alertError("Something Went Wrong", { message: "Failed to remove task from sprint."});
-            console.log(err.message);
+            console.error(err.message);
             // alert(err.message || 'Failed to remove task from sprint');
         }
     };
@@ -201,7 +201,7 @@ export default function SprintsPage() {
             setCarryOverToId(null);
         } catch (err: any) {
             alertError("Something Went Wrong", { message: "Failed to carry over tasks."});
-            console.log(err.message);
+            console.error(err.message);
             // alert(err.message || 'Failed to carry over tasks');
         }
     };
@@ -218,7 +218,7 @@ export default function SprintsPage() {
             setMovingTaskId(null);
         } catch (err: any) {
             alertError("Something Went Wrong", { message: "Failed to move task."});
-            console.log(err.message);
+            console.error(err.message);
             // alert(err.message || 'Failed to move task');
         }
     };

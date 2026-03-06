@@ -54,7 +54,7 @@ export default function NewProjectPage() {
             router.push('/dashboard/projects');
         } catch (err: any) {
             alertError("Something Went Wrong", { message: "Failed to create project."});
-            console.log(err.message);
+            console.error(err.message);
             // alert(err.message || 'Failed to create project');
         } finally {
             setIsSubmitting(false);
