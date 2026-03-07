@@ -6,5 +6,6 @@ const { verifyToken } = require('../middleware/authMiddleware');
 router.get('/stats', verifyToken, dashboardController.getDashboardStats);
 router.get('/tasks', verifyToken, dashboardController.getDashboardTasks);
 router.get('/me', verifyToken, dashboardController.getDashboardProfile);
+router.get('/activity', verifyToken, dashboardController.getRecentActivity);
 
 module.exports = router;

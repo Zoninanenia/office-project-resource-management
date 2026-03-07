@@ -113,3 +113,74 @@ exports.getDashboardProfile = async (req, res) => {
         res.status(500).json({ message: err.message });
     }
 };
+
+exports.getRecentActivity = async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit) || 10, 100);
+        const offset = parseInt(req.query.offset) || 0;
+
+        // Each sub-query fetches enough rows; final sort + pagination applied at the end
+        const subLimit = limit + offset; // fetch enough from each source
+
+        const query = `
+            SELECT * FROM (
+                (
+                    SELECT 
+                        'project_created' as type,
+                        p.title as title,
+                        'Project "' || p.title || '" has been created.' as description,
+                        p.createdAt as timestamp
+                    FROM Projects p
+                    ORDER BY p.createdAt DESC
+                    LIMIT $1
+                )
+                UNION ALL
+                (
+                    SELECT 
+                        'task_completed' as type,
+                        t.taskName as title,
+                        'Task "' || t.taskName || '" has been completed.' as description,
+                        t.createdDate as timestamp
+                    FROM Tasks t
+                    WHERE t.status = 'done'
+                    ORDER BY t.createdDate DESC
+                    LIMIT $1
+                )
+                UNION ALL
+                (
+                    SELECT 
+                        'task_created' as type,
+                        t.taskName as title,
+                        'Task "' || t.taskName || '" has been created.' as description,
+                        t.createdDate as timestamp
+                    FROM Tasks t
+                    WHERE t.status != 'done'
+                    ORDER BY t.createdDate DESC
+                    LIMIT $1
+                )
+                UNION ALL
+                (
+                    SELECT 
+                        'member_joined' as type,
+                        COALESCE(u.firstName, '') || ' ' || COALESCE(u.lastName, '') as title,
+                        COALESCE(u.firstName, u.username) || ' joined team ' || tm2.teamName || '.' as description,
+                        tmem.joinedAt as timestamp
+                    FROM TeamMembers tmem
+                    JOIN Users u ON tmem.userId = u.userId
+                    JOIN Teams tm2 ON tmem.teamId = tm2.teamId
+                    ORDER BY tmem.joinedAt DESC
+                    LIMIT $1
+                )
+            ) AS all_activity
+            ORDER BY timestamp DESC
+            LIMIT $2 OFFSET $3
+        `;
+
+        const result = await pool.query(query, [subLimit, limit, offset]);
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Recent activity error:', err.message);
+        res.status(500).json({ message: err.message });
+    }
+};
+

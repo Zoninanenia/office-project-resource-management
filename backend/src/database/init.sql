@@ -16,6 +16,7 @@ DROP TYPE IF EXISTS team_role_enum;
 DROP TYPE IF EXISTS task_status_enum;
 DROP TYPE IF EXISTS user_role_enum;
 DROP TYPE IF EXISTS project_status_enum;
+DROP TYPE IF EXISTS notification_type_enum;
 
 -- Create Enums
 CREATE TYPE team_role_enum AS ENUM ('leader', 'member', 'observer');
