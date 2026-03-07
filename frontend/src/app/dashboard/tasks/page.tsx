@@ -116,7 +116,7 @@ export default function GlobalTasksPage() {
                 const data = await api.get<ExtendedTask[]>('/tasks');
                 setTasks(data);
             } catch (err: any) {
-                console.error(err.message);
+                console.error(err.message || 'Failed to fetch tasks');
                 setError(err.message || 'Failed to fetch tasks');
             } finally {
                 setLoading(false);
@@ -266,9 +266,7 @@ export default function GlobalTasksPage() {
                 teamId: '',
             });
         } catch (err: any) {
-            alertError("Something Went Wrong", { message: "Failed to process task." });
-            console.error(err.message);
-            // alert(err.message || 'Failed to process task');
+            console.error(err.message || 'Failed to process task');
         }
     };
 
@@ -280,9 +278,7 @@ export default function GlobalTasksPage() {
                 const data = await api.get<ExtendedTask[]>('/tasks');
                 setTasks(data);
             } catch (err: any) {
-                alertError("Something Went Wrong", { message: "Failed to delete task." });
-                console.error(err.message);
-                // alert(err.message || 'Failed to delete task');
+                console.error(err.message || 'Failed to delete task');
             }
         }
     };
@@ -297,9 +293,7 @@ export default function GlobalTasksPage() {
             const data = await api.get<Attachment[]>(`/tasks/${task.taskId}/attachments`);
             setAttachments(data);
         } catch (err: any) {
-            alertError("Something Went Wrong", { message: "Failed to load attachments." });
-            console.error(err.message);
-            // alert(err.message || 'Failed to load attachments');
+            console.error(err.message || 'Failed to load attachments');
         } finally {
             setAttachmentLoading(false);
         }
@@ -327,9 +321,7 @@ export default function GlobalTasksPage() {
             const data = await api.get<Attachment[]>(`/tasks/${attachmentTask.taskId}/attachments`);
             setAttachments(data);
         } catch (err: any) {
-            alertError("Something Went Wrong", { message: "Upload failed." });
-            console.error(err.message);
-            // alert(err.message || 'Upload failed');
+            console.error(err.message || 'Upload failed');
         } finally {
             setIsUploading(false);
             e.target.value = ''; // reset input
@@ -343,9 +335,7 @@ export default function GlobalTasksPage() {
             await api.delete(`/tasks/${attachmentTask.taskId}/attachments/${attachmentId}`);
             setAttachments(prev => prev.filter(a => a.attachmentId !== attachmentId));
         } catch (err: any) {
-            alertError("Something Went Wrong", { message: "Failed to delete attachment." });
-            console.error(err.message);
-            // alert(err.message || 'Failed to delete attachment');
+            console.error(err.message || 'Failed to delete attachment');
         }
     };
 
@@ -358,9 +348,7 @@ export default function GlobalTasksPage() {
             const data = await api.get<TaskComment[]>(`/tasks/${task.taskId}/comments`);
             setComments(data);
         } catch (err: any) {
-            alertError("Something Went Wrong", { message: "Failed to load comments." });
-            console.error(err.message);
-            // alert(err.message || 'Failed to load comments');
+            console.error(err.message || 'Failed to load comments');
         } finally {
             setCommentsLoading(false);
         }
@@ -380,9 +368,7 @@ export default function GlobalTasksPage() {
             const data = await api.get<TaskComment[]>(`/tasks/${commentTask.taskId}/comments`);
             setComments(data);
         } catch (err: any) {
-            alertError("Something Went Wrong", { message: "Failed to add comment." });
-            console.error(err.message);
-            // alert(err.message || 'Failed to add comment');
+            console.error(err.message || 'Failed to add comment');
         } finally {
             setIsSubmittingComment(false);
         }
@@ -471,9 +457,7 @@ export default function GlobalTasksPage() {
             setTasks(prev => prev.map(t =>
                 t.taskId === taskId ? { ...t, status: previousStatus } : t
             ));
-            alertError("Something Went Wrong", { message: "Unable to update task status." });
-            console.error(err.message);
-            // alert(err.message || 'ไม่สามารถอัปเดตสถานะงานได้');
+            console.error(err.message || 'Unable to update task status');
         }
     };
 
@@ -533,9 +517,6 @@ export default function GlobalTasksPage() {
             ));
         } catch (err: any) {
             console.error('Failed to update dependencies', err);
-            alertError("Something Went Wrong", { message: "Failed to update dependencies." });
-            console.error(err.message);
-            // alert(err.message || 'Failed to update dependencies');
         } finally {
             setSavingDep(false);
         }

@@ -5,7 +5,7 @@ import { api } from '@/lib/api';
 import { Sprint, Task } from '@/types';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { alertSuccess, alertError } from '@/components/Alertmodal';
+import { alertSuccess } from '@/components/Alertmodal';
 
 export default function SprintsPage() {
     const params = useParams();
@@ -99,9 +99,7 @@ export default function SprintsPage() {
             setEditingSprint(null);
             setForm({ sprintName: '', startDate: '', endDate: '' });
         } catch (err: any) {
-            alertError("Something Went Wrong", { message: "Failed to save sprint."});
-            console.error(err.message);
-            // alert( err.message || 'Failed to save sprint');
+            console.error(err.message || 'Failed to save sprint');
         }
     };
 
@@ -116,9 +114,7 @@ export default function SprintsPage() {
             setSprints(sprintsData);
             setTasks(tasksData.filter(t => t.projectId === projectId));
         } catch (err: any) {
-            alertError("Something Went Wrong", { message: "Failed to delete sprint."});
-            console.error(err.message);
-            // alert(err.message || 'Failed to delete sprint');
+            console.error(err.message || 'Failed to delete sprint');
         }
     };
 
@@ -129,9 +125,7 @@ export default function SprintsPage() {
                 s.sprintId === sprintId ? { ...s, status: newStatus as Sprint['status'] } : s
             ));
         } catch (err: any) {
-            alertError("Something Went Wrong", { message: "Failed to update status."});
-            console.error(err.message);
-            // alert(err.message || 'Failed to update status');
+            console.error(err.message || 'Failed to update status');
         }
     };
 
@@ -146,9 +140,7 @@ export default function SprintsPage() {
             const sprintsData = await api.get<Sprint[]>(`/sprints/project/${projectId}`);
             setSprints(sprintsData);
         } catch (err: any) {
-            alertError("Something Went Wrong", { message: "Failed to assign task."});
-            console.error(err.message);
-            // alert(err.message || 'Failed to assign task');
+            console.error(err.message || 'Failed to assign task');
         }
     };
 
@@ -160,9 +152,7 @@ export default function SprintsPage() {
             const sprintsData = await api.get<Sprint[]>(`/sprints/project/${projectId}`);
             setSprints(sprintsData);
         } catch (err: any) {
-            alertError("Something Went Wrong", { message: "Failed to remove task from sprint."});
-            console.error(err.message);
-            // alert(err.message || 'Failed to remove task from sprint');
+            console.error(err.message || 'Failed to remove task from sprint');
         }
     };
 
@@ -200,9 +190,7 @@ export default function SprintsPage() {
             setCarryOverFromId(null);
             setCarryOverToId(null);
         } catch (err: any) {
-            alertError("Something Went Wrong", { message: "Failed to carry over tasks."});
-            console.error(err.message);
-            // alert(err.message || 'Failed to carry over tasks');
+            console.error(err.message || 'Failed to carry over tasks');
         }
     };
 
@@ -217,9 +205,7 @@ export default function SprintsPage() {
             setTasks(tasksData.filter(t => t.projectId === projectId));
             setMovingTaskId(null);
         } catch (err: any) {
-            alertError("Something Went Wrong", { message: "Failed to move task."});
-            console.error(err.message);
-            // alert(err.message || 'Failed to move task');
+            console.error(err.message || 'Failed to move task');
         }
     };
 

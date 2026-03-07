@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 export default function LoginPage() {
     const router = useRouter();
     const [formData, setFormData] = useState({ username: '', password: '' });
+    const [showPass, setShowPass] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -15,7 +16,6 @@ export default function LoginPage() {
         e.preventDefault();
         setLoading(true);
         setError('');
-
         try {
             // In a real app, you'd store the token in localStorage/cookies
             const data = await api.post<{ token: string; user: any }>('/auth/login', formData);
@@ -73,7 +73,7 @@ export default function LoginPage() {
                         <label className="block text-gray-700 text-sm font-bold mb-3 ml-1" htmlFor="password">
                             Password
                         </label>
-                        <input
+                        {/* <input
                             type="password"
                             id="password"
                             value={formData.password}
@@ -81,7 +81,37 @@ export default function LoginPage() {
                             className="w-full px-5 py-4 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-cyan-500 focus:bg-white text-gray-800 placeholder-gray-400 focus:outline-none transition-all duration-300 shadow-sm font-medium"
                             placeholder="Enter your password"
                             required
-                        />
+                        /> */}
+                        <div className="relative"> 
+                            <input
+                            type={showPass ? "text" : "password"}
+                            placeholder="Enter your password"
+                            className="w-full px-5 py-4 pr-12 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-cyan-500 focus:bg-white text-gray-800 placeholder-gray-400 focus:outline-none transition-all duration-300 shadow-sm font-medium"
+                            required
+                            autoFocus
+                            value={formData.password}
+                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                            />
+                            
+                            <button
+                            type="button"
+                            onClick={() => setShowPass(!showPass)}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-[#a09c96] hover:text-[#5a5650] transition-colors focus:outline-none"
+                            >
+                            {showPass ? (
+                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                <circle cx="12" cy="12" r="3" />
+                                </svg>
+                            ) : (
+                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                                <line x1="1" y1="1" x2="23" y2="23" />
+                                </svg>
+                            )}
+                            </button>
+                        </div>
                     </div>
 
                     <div className="pt-2">

@@ -56,7 +56,7 @@ export default function ProjectsPage() {
                 setProjects(data);
             } catch (err: any) {
                 if (err.message !== 'No projects found') {
-                    console.error(err.message);
+                    console.error(err.message || 'Failed to fetch projects');
                     setError(err.message || 'Failed to fetch projects');
                 }
             } finally {

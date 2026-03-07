@@ -10,7 +10,6 @@ import { alertError } from '@/components/Alertmodal';
 export default function UserManagementPage() {
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
     const [search, setSearch] = useState('');
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [currentUserId, setCurrentUserId] = useState<number | null>(null);
@@ -31,9 +30,7 @@ export default function UserManagementPage() {
             const data = await api.get<User[]>('/users');
             setUsers(data);
         } catch (err: any) {
-            alertError("Something Went Wrong", { message: "Failed to fetch users."});
-            console.error(err.message);
-            // setError(err.message || 'Failed to fetch users');
+            console.error(err.message || 'Failed to fetch users');
         } finally {
             setLoading(false);
         }
@@ -53,9 +50,7 @@ export default function UserManagementPage() {
             await api.put(`/users/${userId}/role`, { role: newRole });
             setUsers(users.map(u => u.userId === userId ? { ...u, role: newRole } : u));
         } catch (err: any) {
-            alertError("Something Went Wrong", { message: "Failed to update role."});
-            console.error(err.message);
-            // alert(err.message || 'Failed to update role');
+            console.error(err.message || 'Failed to update role');
         }
     };
 
@@ -117,8 +112,7 @@ export default function UserManagementPage() {
                 role: 'user',
             });
         } catch (err: any) {
-            alertError("Something Went Wrong", { message: err.message || "Failed to create user."});
-            // alert(err.message || 'Failed to create user');
+            console.error(err.message || 'Failed to create user');
         }
     };
 

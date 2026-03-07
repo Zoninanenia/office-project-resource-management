@@ -68,7 +68,7 @@ export default function ProjectDetailPage() {
                 setTeams(teamsData.filter(t => t.projectId === projectId));
                 setTasks(tasksData.filter(t => t.projectId === projectId));
             } catch (err: any) {
-                console.error(err);
+                console.error(err.message || 'Failed to load project details');
                 setError(err.message || 'Failed to load project details');
             } finally {
                 setLoading(false);
@@ -102,9 +102,7 @@ export default function ProjectDetailPage() {
             setProject({ ...project, status: 'completed' });
             // Show some success feedback? The UI update should be enough for now.
         } catch (err: any) {
-            alertError("Something Went Wrong", { message: "Failed to mark project as completed."});
-            console.error(err.message);
-            // alert(err.message || 'Failed to mark project as completed');
+            console.error(err.message || 'Failed to mark project as completed');
         }
     };
 
@@ -115,7 +113,6 @@ export default function ProjectDetailPage() {
                 const users = await api.get<User[]>('/users?role=worker');
                 setPotentialAssignees(users);
             } catch (err) {
-                alertError("Something Went Wrong", { message: "Failed to fetch users for assignment."});
                 console.error('Failed to fetch users for assignment', err);
             }
         }
@@ -176,9 +173,7 @@ export default function ProjectDetailPage() {
             setTasks(tasksData.filter(t => t.projectId === projectId));
             setNewTask({ taskName: '', description: '', status: 'todo', dueDate: '', estimatedHours: '', assignedTo: [], dependencies: [], teamId: '' });
         } catch (err: any) {
-            alertError("Something Went Wrong", { message: "Failed to process task."});
-            console.error(err.message);
-            // alert(err.message || 'Failed to process task');
+            console.error(err.message || 'Failed to process task');
         }
     };
 
@@ -189,9 +184,7 @@ export default function ProjectDetailPage() {
                 const tasksData = await api.get<Task[]>('/tasks');
                 setTasks(tasksData.filter(t => t.projectId === projectId));
             } catch (err: any) {
-                alertError("Something Went Wrong", { message: "Failed to delete task."});
-                console.error(err.message);
-                // alert(err.message || 'Failed to delete task');
+                console.error(err.message || 'Failed to delete task');
             }
         }
     };
@@ -286,9 +279,6 @@ export default function ProjectDetailPage() {
             ));
         } catch (err: any) {
             console.error('Failed to update dependencies', err);
-            alertError("Something Went Wrong", { message: "Failed to update dependencies."});
-            console.error(err.message);
-            // alert(err.message || 'Failed to update dependencies');
         } finally {
             setSavingDep(false);
             handleDragEnd();
@@ -618,11 +608,14 @@ export default function ProjectDetailPage() {
                             </div>
                         )}
 
-                        <div className="mt-6 pt-6 border-t border-gray-100 dark:border-gray-700">
-                            <Link href="/dashboard/teams" className="w-full block text-center py-3 bg-purple-50 dark:bg-purple-900/10 text-purple-600 dark:text-purple-400 font-bold rounded-xl hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors">
-                                Manage Teams
-                            </Link>
-                        </div>
+                        {currentUserRole !== 'user' && (
+                            <div className="mt-6 pt-6 border-t border-gray-100 dark:border-gray-700">
+                                <Link href="/dashboard/teams" className="w-full block text-center py-3 bg-purple-50 dark:bg-purple-900/10 text-purple-600 dark:text-purple-400 font-bold rounded-xl hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors">
+                                    Manage Teams
+                                </Link>
+                            </div>
+                        )}
+                        
                     </div>
                 </div>
             </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
@@ -16,17 +16,64 @@ export default function RegisterPage() {
     });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [showPass, setShowPass] = useState(false);
+
+    useEffect(() => {
+        setError('');
+    }, [formData])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError('');
-
         try {
+            const nameRegex = /^[\p{L}\s]+$/u;
+            if (formData.firstName && !nameRegex.test(formData.firstName)) {
+                setError("First name: Only letters are allowed.");
+                return;
+            }
+            if (formData.lastName && !nameRegex.test(formData.lastName)) {
+                setError("Last name: Only letters are allowed.");
+                return;
+            }
+            if (!formData.firstName && !formData.lastName) {
+                setError("Please fill in at least one field.");
+                return;
+            }
+
+            if (formData.password.trim().length === 0) {
+                setError("Password cannot be empty.");
+                return;
+            }
+
+            if (formData.password.length < 8) {
+                setError("Password must be at least 8 characters.");
+                return;
+            }
+            if (formData.password.length > 50) {
+                setError("Password must not exceed 50 characters.");
+                return;
+            }
+            const alphanumericRegex = /^[a-zA-Z0-9]+$/; // เฉพาะภาษาอังกฤษ (A-Z, a-z) และตัวเลข (0-9)
+            if (!alphanumericRegex.test(formData.password)) {
+                setError("Password can only contain English letters and numbers.");
+                return;
+            }
+
+            if (!formData.email.trim()) {
+                setError("Please enter an email address." );
+                return;
+            }
+
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+                setError("Please enter a valid email address.");
+                return;
+            }
             await api.post('/auth/register', formData);
             router.push('/login');
         } catch (err: any) {
-            setError(err.message || 'Registration failed');
+            console.error(err.message || 'Registration failed');
+            // setError(err.message || 'Registration failed');
         } finally {
             setLoading(false);
         }
@@ -112,7 +159,7 @@ export default function RegisterPage() {
 
                     <div>
                         <label className="block text-gray-700 text-sm font-bold mb-2 ml-1" htmlFor="password">Password</label>
-                        <input
+                        {/* <input
                             type="password"
                             placeholder="Password"
                             id="password"
@@ -120,7 +167,38 @@ export default function RegisterPage() {
                             onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                             className="w-full px-5 py-3 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-cyan-500 focus:bg-white text-gray-800 placeholder-gray-400 focus:outline-none transition-all duration-300 shadow-sm font-medium"
                             required
-                        />
+                        /> */}
+                        <div className="relative"> 
+                            <input
+                            type={showPass ? "text" : "password"}
+                            placeholder="Password"
+                            className="w-full px-5 py-4 pr-12 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-cyan-500 focus:bg-white text-gray-800 placeholder-gray-400 focus:outline-none transition-all duration-300 shadow-sm font-medium"
+                            required
+                            autoFocus
+                            value={formData.password}
+                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                            />
+                            
+                            <button
+                            type="button"
+                            onClick={() => setShowPass(!showPass)}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-[#a09c96] hover:text-[#5a5650] transition-colors focus:outline-none"
+                            >
+                            {showPass ? (
+                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                <circle cx="12" cy="12" r="3" />
+                                </svg>
+                            ) : (
+                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                                <line x1="1" y1="1" x2="23" y2="23" />
+                                </svg>
+                            )}
+                            </button>
+                        </div>
+                        
                     </div>
 
                     <div className="pt-2">

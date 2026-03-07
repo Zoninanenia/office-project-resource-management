@@ -60,17 +60,14 @@ export default function SettingsPage() {
         const nameRegex = /^[\p{L}\s]+$/u;
         if (firstName && !nameRegex.test(firstName)) {
             alertError("Incomplete Form", { message: "First name: Only letters are allowed."});
-            // alert("First name: Only letters are allowed.");
             return;
         }
         if (lastName && !nameRegex.test(lastName)) {
             alertError("Incomplete Form", { message: "Last name: Only letters are allowed."});
-            // alert("Last name: Only letters are allowed.");
             return;
         }
         if (!firstName && !lastName) {
             alertError("Incomplete Form", { message: "Please fill in at least one field."});
-            // alert("Please fill in at least one field.");
             return;
         }
         try {
@@ -86,11 +83,8 @@ export default function SettingsPage() {
             setLastName("");
             loadUserData();
             alertSuccess("Saved Successfully", { message: "Changes have been saved." });
-
-            // window.location.reload();
         }catch (err) {
-            alertError("Something Went Wrong", { message: "Failed to update." });
-            // alert('Failed to update');
+            console.error('Failed to update Name', err);
         }
     };
 
@@ -98,45 +92,37 @@ export default function SettingsPage() {
         e.preventDefault();
         if (password.trim().length === 0) {
             alertError("Invalid Password", { message: "Password cannot be empty."});
-            // alert('Password cannot be empty');
             return;
         }
         if (confirmPassword.trim().length === 0) {
             alertError("Invalid Password", { message: "confirmPassword cannot be empty."});
-            // alert('confirmPassword cannot be empty');
             return;
         }
 
         if (password !== confirmPassword) {
             alertError("Invalid Password", { message: "Passwords do not match."});
-            // alert("Passwords do not match");
             return;
         }
         if (password.length < 8) {
             alertError("Invalid Password", { message: "Password must be at least 8 characters."});
-            // alert("Password must be at least 8 characters");
             return;
         }
         if (password.length > 50) {
             alertError("Invalid Password", { message: "Password must not exceed 50 characters."});
-            // alert("Password must not exceed 50 characters");
             return;
         }
         const alphanumericRegex = /^[a-zA-Z0-9]+$/; // เฉพาะภาษาอังกฤษ (A-Z, a-z) และตัวเลข (0-9)
         if (!alphanumericRegex.test(password)) {
             alertError("Invalid Password", { message: "Password can only contain English letters and numbers."});
-            // alert("Password can only contain English letters and numbers");
             return;
         }
         try {
             await api.put(`/users/${userId}/newpassword/`, { password });
-            // alert('Password updated successfully');
             alertSuccess("Saved Successfully", { message: "Changes have been saved." });
             setPassword("");
             setConfirmPassword("");
         }catch (err) {
-            alertError("Something Went Wrong", { message: "Failed to update password."});
-            // alert('Failed to update password');
+            console.error('Failed to update Password', err);
         }
     };
 
@@ -151,7 +137,6 @@ export default function SettingsPage() {
                 {userRole !== "0" ? (
                 <>
                     {/* Tabs */}
-                    {/* <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-2xl p-1.5 mb-8"> */}
                     <div className="flex gap-2 mb-4 bg-white dark:bg-gray-800 p-1.5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 w-fit">
                         <button
                             onClick={() => setActiveSection("profile")}
@@ -254,8 +239,6 @@ export default function SettingsPage() {
                         <form onSubmit={handlePassSubmit}>
                             <div className="grid grid-cols-2 gap-4 mb-5">
 
-                            {/* <div className="flex flex-col gap-4 mb-5"> */}
-
                             {/* New Password */}
                             <div className="flex flex-col gap-1.5">
                                 <label className="text-[11px] font-medium uppercase tracking-wide">New Password</label>
@@ -348,8 +331,6 @@ export default function SettingsPage() {
                                 </div>
                             </div>
                             </div>
-
-                            {/* </div> */}
 
                             <button
                             type="submit"
