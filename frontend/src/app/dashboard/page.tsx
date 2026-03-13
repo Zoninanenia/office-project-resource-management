@@ -130,9 +130,6 @@ export default function DashboardPage() {
                             <FolderIcon className="w-5 h-5" />
                             Start New Project
                         </Link>
-                        <button className="px-6 py-3 bg-brand-teal/50 hover:bg-brand-teal hover:shadow-lg hover:shadow-teal-500/30 hover:border-white/60 text-white font-bold rounded-xl border border-white/30 transition-all flex items-center gap-2">
-                            View Reports
-                        </button>
                     </div>
                 </div>
             </div>
@@ -144,28 +141,24 @@ export default function DashboardPage() {
                     value={stats?.activeProjects || 0}
                     icon={<FolderIcon className="w-8 h-8 text-white" />}
                     color="from-brand-cyan to-blue-500"
-                    trend="+2 this week"
                 />
                 <StatCard
                     title="Pending Tasks"
                     value={stats?.tasksAssigned || 0}
                     icon={<ListIcon className="w-8 h-8 text-white" />}
                     color="from-brand-peach to-orange-500"
-                    trend="5 high priority"
                 />
                 <StatCard
                     title="Tasks Completed"
                     value={stats?.completedTasks || 0}
                     icon={<CheckIcon className="w-8 h-8 text-white" />}
                     color="from-brand-sage to-emerald-600"
-                    trend="+12% completion"
                 />
                 <StatCard
                     title="Team Members"
                     value={stats?.teamMembers || 0}
                     icon={<UsersIcon className="w-8 h-8 text-white" />}
                     color="from-brand-yellow to-yellow-500"
-                    trend="Full strength"
                 />
             </div>
 
