@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { api, API_BASE_URL } from '@/lib/api';
 import { Task, User } from '@/types';
 import { useProject } from '../ProjectContext';
@@ -9,6 +9,7 @@ import { SearchBar } from '@/components/SearchBar';
 import { StatusBadge } from '@/components/StatusBadge';
 import { AvatarGroup } from '@/components/Avatar';
 import { alertError } from '@/components/Alertmodal';
+
 
 
 // Extend Task type locally if needed for extra fields from join
@@ -102,6 +103,15 @@ export default function GlobalTasksPage() {
     const [commentsLoading, setCommentsLoading] = useState(false);
     const [newComment, setNewComment] = useState('');
     const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+    const [commentToDelete, setCommentToDelete] = useState<number | null>(null);
+
+    // --- State สำหรับระบบ Mention ---
+    const [showMentions, setShowMentions] = useState(false);
+    const [mentionQuery, setMentionQuery] = useState('');
+    const [cursorPosition, setCursorPosition] = useState(0);
+    const [selectedMentions, setSelectedMentions] = useState<number[]>([]);
+    const commentInputRef = useRef<HTMLInputElement>(null);
+    const [pmUsers, setPmUsers] = useState<User[]>([]);
 
     useEffect(() => {
         const userStr = localStorage.getItem('user');
@@ -134,9 +144,30 @@ export default function GlobalTasksPage() {
             }
         };
 
+        const fetchAllUsersForPM = async () => {
+            try {
+                // 🌟 แก้ไข: บังคับขอเฉพาะ Project Manager ตรงๆ จาก Backend
+                // เพื่อให้ Worker/Team Leader สามารถมองเห็นรายชื่อ PM ได้
+                const data = await api.get<User[]>('/users?role=project_manager');
+
+                // กรองซ้ำเผื่อ Backend ไม่รองรับ Query Param แล้วส่งมาทุกคน
+                const pms = data.filter(u => u.role === 'project_manager');
+
+                // ถ้าระบบส่ง PM มาสำเร็จ ให้เก็บลง State เลย
+                if (pms.length > 0) {
+                    setPmUsers(pms);
+                } else if (data && data.length > 0) {
+                    // เผื่อกรณี Backend ไม่ได้กรอง role ให้แต่ส่งข้อมูลมา
+                    setPmUsers(data);
+                }
+            } catch (err) {
+                console.error('Failed to fetch PMs', err);
+            }
+        };
 
         fetchTasks();
         fetchTeams();
+        fetchAllUsersForPM();
     }, []);
 
 
@@ -354,6 +385,110 @@ export default function GlobalTasksPage() {
         }
     };
 
+// --- ระบบ Mention ---
+    // 🌟 รวมรายชื่อ PM และ คนในทีม (Leaders & Members)
+    const getMentionableUsers = () => {
+        const usersMap = new Map();
+
+        // 1. นำ Project Managers ใส่ลงไปก่อน (ใช้ username เป็นชื่อไปเลยเพื่อป้องกัน Error)
+        pmUsers.forEach(pm => {
+            usersMap.set(pm.userId, {
+                userId: pm.userId,
+                username: pm.username,
+                name: pm.username || 'Project Manager',
+                role: pm.role || 'project_manager'
+            });
+        });
+
+        // 2. นำคนใน Team (Leader และ Members) ใส่ลงไป
+        teams.forEach(team => {
+            if (team.leader) usersMap.set(team.leader.userId, team.leader);
+            if (team.members) team.members.forEach(m => usersMap.set(m.userId, m));
+        });
+
+        return Array.from(usersMap.values());
+    };
+
+    // เก็บใส่ตัวแปรไว้ใช้งานร่วมกัน
+    const mentionableUsers = getMentionableUsers();
+
+    // 🌟 ฟังก์ชัน Render สีของ Mention ในคอมเมนต์
+    const renderCommentText = (text: string) => {
+        if (!text) return null;
+
+        // แยกข้อความด้วย @ ตามด้วยตัวอักษร
+        const parts = text.split(/(@\S+)/g);
+
+        return parts.map((part, index) => {
+            if (part.startsWith('@')) {
+                const usernameToFind = part.slice(1);
+                const matchedUser = mentionableUsers.find(u => u.username === usernameToFind);
+
+                if (matchedUser) {
+                    return (
+                        <span
+                            key={index}
+                            className="font-bold text-brand-cyan bg-cyan-50 dark:bg-cyan-900/30 px-1.5 py-0.5 rounded-md cursor-default border border-cyan-100 dark:border-cyan-800 transition-colors hover:bg-cyan-100 dark:hover:bg-cyan-900/50"
+                            title={`Name: ${matchedUser.name}\nRole: ${matchedUser.role ? matchedUser.role.replace('_', ' ').toUpperCase() : 'UNKNOWN'}`}
+                        >
+                            {part}
+                        </span>
+                    );
+                }
+                // ถ้าค้นไม่เจอ ให้แสดงเป็นตัวหนาสีเทา
+                return <span key={index} className="font-bold text-gray-500">{part}</span>;
+            }
+            return <span key={index}>{part}</span>;
+        });
+    };
+
+    // 🌟 กรองรายชื่อสำหรับ Dropdown (ใส่ดัก undefined ไว้กันแอปพัง)
+    const filteredMentionUsers = mentionableUsers.filter(u => {
+        const uname = u.username || '';
+        const fname = u.name || '';
+        const query = mentionQuery.toLowerCase();
+        return uname.toLowerCase().includes(query) || fname.toLowerCase().includes(query);
+    });
+
+    // ฟังก์ชันตรวจจับการพิมพ์
+    const handleCommentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        setNewComment(val);
+
+        const cursor = e.target.selectionStart || 0;
+        const textBeforeCursor = val.slice(0, cursor);
+
+        // เช็คว่ามีตัว @ แล้วตามด้วยข้อความที่ไม่ใช่ช่องว่าง (หยุดเมื่อเจอ Space)
+        const match = textBeforeCursor.match(/(?:^|\s)@(\S*)$/);
+
+        if (match) {
+            setShowMentions(true);
+            setMentionQuery(match[1]); // ข้อความหลัง @
+            setCursorPosition(cursor);
+        } else {
+            setShowMentions(false);
+        }
+    };
+
+    // ฟังก์ชันเมื่อกดเลือกคนจาก Dropdown
+    const handleSelectMention = (user: any) => {
+        const textBeforeQuery = newComment.slice(0, cursorPosition - mentionQuery.length - 1);
+        const textAfterQuery = newComment.slice(cursorPosition);
+
+        // แทนที่ข้อความด้วย @username
+        const newText = `${textBeforeQuery}@${user.username} ${textAfterQuery}`;
+        setNewComment(newText);
+        setShowMentions(false);
+
+        // เก็บ ID คนที่ถูก Mention เอาไว้ส่งไปให้ Backend
+        if (!selectedMentions.includes(user.userId)) {
+            setSelectedMentions(prev => [...prev, user.userId]);
+        }
+
+        // โฟกัสกลับไปที่ช่องพิมพ์
+        if (commentInputRef.current) commentInputRef.current.focus();
+    };
+
     // ฟังก์ชันส่งคอมเมนต์ใหม่
     const handleSubmitComment = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -361,8 +496,15 @@ export default function GlobalTasksPage() {
 
         setIsSubmittingComment(true);
         try {
-            await api.post(`/tasks/${commentTask.taskId}/comments`, { comment: newComment });
-            setNewComment(''); // ล้างช่องพิมพ์เมื่อส่งเสร็จ
+            // ส่ง comment และ mentions (Array ของ ID) ไปยัง Backend
+            await api.post(`/tasks/${commentTask.taskId}/comments`, {
+                comment: newComment,
+                mentions: selectedMentions
+            });
+
+            setNewComment(''); // ล้างช่องพิมพ์
+            setSelectedMentions([]); // ล้างรายการ mention
+            setShowMentions(false);
 
             // โหลดรายการคอมเมนต์ใหม่เพื่อให้อัปเดตทันที
             const data = await api.get<TaskComment[]>(`/tasks/${commentTask.taskId}/comments`);
@@ -371,6 +513,24 @@ export default function GlobalTasksPage() {
             console.error(err.message || 'Failed to add comment');
         } finally {
             setIsSubmittingComment(false);
+        }
+    };
+
+    // ฟังก์ชันเปิด Modal ยืนยันเมื่อกดไอคอนถังขยะ
+    const confirmDeleteComment = (commentId: number) => {
+        setCommentToDelete(commentId);
+    };
+
+    // ฟังก์ชันกดยืนยันการลบจริงใน Modal
+    const executeDeleteComment = async () => {
+        if (!commentTask || !commentToDelete) return;
+        try {
+            await api.delete(`/tasks/${commentTask.taskId}/comments/${commentToDelete}`);
+            // อัปเดต UI ให้คอมเมนต์นั้นหายไปทันทีโดยไม่ต้องโหลดหน้าใหม่
+            setComments(prev => prev.filter(c => c.taskCommentId !== commentToDelete));
+            setCommentToDelete(null); // ปิด Modal
+        } catch (err: any) {
+            alert(err.message || 'Failed to delete comment');
         }
     };
 
@@ -934,44 +1094,116 @@ export default function GlobalTasksPage() {
                                 </div>
                             ) : (
                                 comments.map(comment => (
-                                    <div key={comment.taskCommentId} className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-2xl border border-gray-100 dark:border-gray-600">
-                                        <div className="flex justify-between items-center mb-2">
-                                            <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{comment.username}</span>
-                                            <span className="text-[10px] text-gray-400 font-medium">
+                                    // เอาคลาส group ออกจากตรงนี้ได้เลยเพราะไม่ได้ใช้แล้ว
+                                    <div key={comment.taskCommentId} className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-2xl border border-gray-100 dark:border-gray-600 relative">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{comment.username}</span>
+                                                <span className="text-[10px] text-gray-400 font-medium">
                                                 {new Date(comment.createdDate).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                                             </span>
+                                            </div>
+
+                                            {/* ไอคอนถังขยะจะแสดงค้างไว้ตลอดสำหรับคอมเมนต์ของเรา */}
+                                            {String(comment.userId) === String(userId) && (
+                                                <button
+                                                    onClick={() => confirmDeleteComment(comment.taskCommentId)}
+                                                    className="text-gray-400 hover:text-red-500 transition-colors p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 flex-shrink-0"
+                                                    title="Delete comment"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    </svg>
+                                                </button>
+                                            )}
                                         </div>
-                                        <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{comment.comment}</p>
+                                        <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
+                                            {renderCommentText(comment.comment)}
+                                        </p>
                                     </div>
                                 ))
                             )}
                         </div>
 
-                        {/* Add Comment Form */}
-                        <form onSubmit={handleSubmitComment} className="mt-auto border-t border-gray-100 dark:border-gray-700 pt-5 flex gap-3">
-                            <input
-                                type="text"
-                                value={newComment}
-                                onChange={(e) => setNewComment(e.target.value)}
-                                placeholder="Type a comment..."
-                                className="flex-1 px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl text-sm outline-none focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 dark:text-white transition-all"
-                                disabled={isSubmittingComment}
-                            />
-                            <button
-                                type="submit"
-                                disabled={!newComment.trim() || isSubmittingComment}
-                                className="px-5 py-3 bg-brand-cyan text-white font-bold rounded-xl disabled:opacity-50 hover:bg-cyan-600 transition-colors flex items-center justify-center min-w-[80px]"
-                            >
-                                {isSubmittingComment ? (
-                                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                ) : (
-                                    'Send'
-                                )}
-                            </button>
-                        </form>
+                        {/* Add Comment Form with Mention UI */}
+                        <div className="relative mt-auto border-t border-gray-100 dark:border-gray-700 pt-5">
+                            {/* Mention Dropdown */}
+                            {showMentions && filteredMentionUsers.length > 0 && (
+                                <div className="absolute bottom-full left-0 mb-2 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-xl z-50 max-h-48 overflow-y-auto">
+                                    {filteredMentionUsers.map(user => (
+                                        <div
+                                            key={user.userId}
+                                            onClick={() => handleSelectMention(user)}
+                                            className="px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer flex items-center gap-3 border-b border-gray-50 dark:border-gray-700/50 last:border-0 transition-colors"
+                                        >
+                                            <div className="w-8 h-8 rounded-full bg-brand-cyan/20 text-brand-cyan flex items-center justify-center font-bold text-xs flex-shrink-0">
+                                                {user.username.charAt(0).toUpperCase()}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <div className="text-sm font-bold text-gray-800 dark:text-gray-200 truncate">@{user.username}</div>
+                                                <div className="text-[10px] text-gray-500 truncate">{user.name} • {user.role?.replace('_', ' ')}</div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <form onSubmit={handleSubmitComment} className="flex gap-3">
+                                <input
+                                    ref={commentInputRef}
+                                    type="text"
+                                    value={newComment}
+                                    onChange={handleCommentChange}
+                                    placeholder="Type a comment... (use @ to mention)"
+                                    className="flex-1 px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-xl text-sm outline-none focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/20 dark:text-white transition-all"
+                                    disabled={isSubmittingComment}
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={!newComment.trim() || isSubmittingComment}
+                                    className="px-5 py-3 bg-brand-cyan text-white font-bold rounded-xl disabled:opacity-50 hover:bg-cyan-600 transition-colors flex items-center justify-center min-w-[80px]"
+                                >
+                                    {isSubmittingComment ? (
+                                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                    ) : (
+                                        'Send'
+                                    )}
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             )}
+             {/* Delete Comment Confirmation Modal */}
+             {commentToDelete && (
+                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60] animate-fade-in">
+                     <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 w-full max-w-sm shadow-2xl flex flex-col items-center text-center">
+                         <div className="w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-500 mb-4">
+                             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                             </svg>
+                         </div>
+                         <h3 className="text-lg font-black text-gray-900 dark:text-white mb-2">Delete Comment?</h3>
+                         <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 font-medium">
+                             Are you sure you want to delete this comment? This action cannot be undone.
+                         </p>
+                         <div className="flex gap-3 w-full">
+                             <button
+                                 onClick={() => setCommentToDelete(null)}
+                                 className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-bold rounded-xl transition-colors"
+                             >
+                                 Cancel
+                             </button>
+                             <button
+                                 onClick={executeDeleteComment}
+                                 className="flex-1 px-4 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition-colors shadow-lg shadow-red-500/30"
+                             >
+                                 Delete
+                             </button>
+                         </div>
+                     </div>
+                 </div>
+             )}
         </div >
     );
 }
