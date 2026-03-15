@@ -136,7 +136,7 @@ CREATE TABLE Notifications (
     notificationId SERIAL PRIMARY KEY,
     userId INTEGER REFERENCES Users(userId) ON DELETE CASCADE,
     taskId INTEGER REFERENCES Tasks(taskId) ON DELETE CASCADE,
-    type notification_type_enum NOT NULL, -- เปลี่ยนมาใช้ ENUM แทน VARCHAR
+    type notification_type_enum NOT NULL, 
     message TEXT NOT NULL,
     isRead BOOLEAN DEFAULT FALSE,
     createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
