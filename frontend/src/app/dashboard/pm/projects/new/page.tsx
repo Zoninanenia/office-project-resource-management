@@ -17,6 +17,8 @@ export default function NewProjectPage() {
         status: 'planning'
     });
 
+    const today = new Date().toISOString().split('T')[0];
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!project.title.trim()) {
@@ -31,6 +33,11 @@ export default function NewProjectPage() {
 
         if (!project.startDate || !project.endDate) {
             alertError("Incomplete Form", { message: "Please select both start and end date." });
+            return;
+        }
+
+        if (project.startDate < today) {
+            alertError("Invalid Date", { message: "Start date cannot be in the past." });
             return;
         }
 
@@ -99,6 +106,7 @@ export default function NewProjectPage() {
                             value={project.startDate}
                             onChange={e => setProject({ ...project, startDate: e.target.value })}
                             className="w-full p-3 bg-gray-50 dark:bg-gray-900 border-2 border-transparent focus:border-cyan-500 rounded-xl font-bold outline-none transition-all dark:text-white"
+                            min={today}
                             required
                         />
                     </div>
@@ -109,6 +117,7 @@ export default function NewProjectPage() {
                             value={project.endDate}
                             onChange={e => setProject({ ...project, endDate: e.target.value })}
                             className="w-full p-3 bg-gray-50 dark:bg-gray-900 border-2 border-transparent focus:border-cyan-500 rounded-xl font-bold outline-none transition-all dark:text-white"
+                            min={project.startDate || today}
                         />
                     </div>
                 </div>

@@ -744,7 +744,6 @@ export default function GlobalTasksPage() {
                             </>)}
                     </div>
                 </div>
-                <p className="text-xs font-bold text-brand-teal dark:text-brand-cyan mb-1 uppercase tracking-wider">{task.projectName}</p>
 
                 {/* Team Badge */}
                 {task.teamName && (
@@ -765,11 +764,24 @@ export default function GlobalTasksPage() {
                     />
                 </div>
 
-                {task.dueDate && (
-                    <div
-                        className="mt-3 pt-2 border-t border-gray-100 dark:border-gray-700 text-[10px] font-bold text-gray-400 flex items-center gap-1">
-                        <span className="material-icons text-[10px]">schedule</span>
-                        {new Date(task.dueDate).toLocaleDateString()}
+                {(task.dueDate || task.projectName) && (
+                    <div className="mt-3 pt-2 border-t border-gray-100 dark:border-gray-700 flex flex-col gap-2">
+                        {task.dueDate && (
+                            <div className="text-[10px] font-bold text-gray-400 flex items-center gap-1">
+                                <span className="material-icons text-[10px]">schedule</span>
+                                {new Date(task.dueDate).toLocaleDateString()}
+                            </div>
+                        )}
+                        {task.projectName && (
+                            <div>
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                                    </svg>
+                                    {task.projectName}
+                                </span>
+                            </div>
+                        )}
                     </div>
                 )}
 

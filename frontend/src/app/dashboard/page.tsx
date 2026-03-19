@@ -154,12 +154,12 @@ export default function DashboardPage() {
                     icon={<CheckIcon className="w-8 h-8 text-white" />}
                     color="from-brand-sage to-emerald-600"
                 />
-                <StatCard
+                {/* <StatCard
                     title="Team Members"
                     value={stats?.teamMembers || 0}
                     icon={<UsersIcon className="w-8 h-8 text-white" />}
                     color="from-brand-yellow to-yellow-500"
-                />
+                /> */}
             </div>
 
             {/* Recent Activity */}
@@ -241,7 +241,7 @@ export default function DashboardPage() {
                             </div>
                         </div>
 
-                        <div className="mt-8 pt-6 border-t border-gray-700">
+                        {/* <div className="mt-8 pt-6 border-t border-gray-700">
                             <div className="flex items-center gap-3">
                                 <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold border-2 border-white/20 text-sm ${userRole === 'project_manager' ? 'bg-linear-to-br from-brand-yellow to-orange-500 text-black' :
                                     userRole === 'team_leader' ? 'bg-linear-to-br from-brand-cyan to-blue-500 text-white' :
@@ -252,8 +252,8 @@ export default function DashboardPage() {
                                         userRole === 'team_leader' ? 'TL' :
                                             userRole === 'worker' ? 'WK' :
                                                 'U'}
-                                </div>
-                                <div>
+                                </div> */}
+                                {/* <div>
                                     <p className="text-xs font-bold text-gray-400 uppercase">
                                         {userRole?.replace('_', ' ') || 'User'}
                                     </p>
@@ -264,10 +264,10 @@ export default function DashboardPage() {
                                                     'w-1/4 bg-gray-400'
                                             }`}></div>
                                     </div>
-                                </div>
+                                </div> */}
                             </div>
-                        </div>
-                    </div>
+                        
+                    
                 )}
             </div>
         </div>
