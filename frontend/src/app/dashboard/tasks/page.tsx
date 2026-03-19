@@ -243,13 +243,13 @@ export default function GlobalTasksPage() {
     const handleCreateTask = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newTask.projectId) {
-            alertError("Incomplete Form", { message: "Please select a project."});
+            alertError("Incomplete Form", { message: "Please select a project." });
             // alert('Please select a project');
             return;
         }
 
         if (!newTask.taskName || !newTask.taskName.trim()) {
-            alertError("Incomplete Form", { message: "Please enter a task name."});
+            alertError("Incomplete Form", { message: "Please enter a task name." });
             // alert("Please enter a task name");
             return;
         }
@@ -261,7 +261,7 @@ export default function GlobalTasksPage() {
         // }
 
         if (!newTask.dueDate) {
-            alertError("Incomplete Form", { message: "Please select a due date."});
+            alertError("Incomplete Form", { message: "Please select a due date." });
             // alert("Please select a due date");
             return;
         }
@@ -385,7 +385,7 @@ export default function GlobalTasksPage() {
         }
     };
 
-// --- ระบบ Mention ---
+    // --- ระบบ Mention ---
     // 🌟 รวมรายชื่อ PM และ คนในทีม (Leaders & Members)
     const getMentionableUsers = () => {
         const usersMap = new Map();
@@ -718,7 +718,7 @@ export default function GlobalTasksPage() {
                             title="Attachments">
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                      d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                    d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                             </svg>
                         </button>
 
@@ -726,19 +726,19 @@ export default function GlobalTasksPage() {
                         {(userRole === 'project_manager' || userRole === 'team_leader') && (
                             <>
                                 <button onClick={() => handleOpenCreateModal(task)}
-                                        className="p-1.5 text-gray-400 hover:text-brand-cyan hover:bg-cyan-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                                        title="Edit Task">
+                                    className="p-1.5 text-gray-400 hover:text-brand-cyan hover:bg-cyan-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                    title="Edit Task">
                                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                              d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                                     </svg>
                                 </button>
                                 <button onClick={() => handleDeleteTask(task.taskId, task.taskName)}
-                                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                                        title="Delete Task">
+                                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                    title="Delete Task">
                                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                     </svg>
                                 </button>
                             </>)}
@@ -859,7 +859,7 @@ export default function GlobalTasksPage() {
     );
 
     return (
-         <div className="h-[calc(100vh-140px)] flex flex-col">
+        <div className="flex flex-col min-h-full">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <div>
                     <h1 className="text-3xl font-black text-gray-800 dark:text-white tracking-tight">Active Tasks</h1>
@@ -900,7 +900,7 @@ export default function GlobalTasksPage() {
             </div>
 
             {/* Kanban Board */}
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-hidden min-h-0">
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* To Do Column */}
                 <div
                     className="flex flex-col h-full bg-gray-50/50 dark:bg-gray-900/50 rounded-3xl p-4 border border-gray-100 dark:border-gray-800"
@@ -914,9 +914,8 @@ export default function GlobalTasksPage() {
                         <span
                             className="bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-bold px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700">{todoTasks.length}</span>
                     </div>
-                    <div className="flex flex-col h-[850px] w-full max-w-md">
-                        <div
-                            className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700">
+                    <div className="flex flex-col w-full max-w-md">
+                        <div className="flex-1">
                             {renderColumnTasks(todoTasks, 'todo')}
                         </div>
                     </div>
@@ -935,9 +934,8 @@ export default function GlobalTasksPage() {
                         <span
                             className="bg-white dark:bg-gray-800 text-brand-cyan text-xs font-bold px-2.5 py-1 rounded-lg border border-cyan-100 dark:border-cyan-900">{inProgressTasks.length}</span>
                     </div>
-                    <div className="flex flex-col h-[850px] w-full max-w-md">
-                        <div
-                            className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-cyan-200 dark:scrollbar-thumb-cyan-900">
+                    <div className="flex flex-col w-full max-w-md">
+                        <div className="flex-1">
                             {renderColumnTasks(inProgressTasks, 'in_progress')}
                         </div>
                     </div>
@@ -956,9 +954,8 @@ export default function GlobalTasksPage() {
                         <span
                             className="bg-white dark:bg-gray-800 text-brand-sage text-xs font-bold px-2.5 py-1 rounded-lg border border-green-100 dark:border-green-900">{doneTasks.length}</span>
                     </div>
-                    <div className="flex flex-col h-[850px] w-full max-w-md">
-                        <div
-                            className="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-green-200 dark:scrollbar-thumb-green-900">
+                    <div className="flex flex-col w-full max-w-md">
+                        <div className="flex-1">
                             {renderColumnTasks(doneTasks, 'done')}
                         </div>
                     </div>
@@ -1112,8 +1109,8 @@ export default function GlobalTasksPage() {
                                             <div className="flex flex-col">
                                                 <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{comment.username}</span>
                                                 <span className="text-[10px] text-gray-400 font-medium">
-                                                {new Date(comment.createdDate).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                                            </span>
+                                                    {new Date(comment.createdDate).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                                                </span>
                                             </div>
 
                                             {/* ไอคอนถังขยะจะแสดงค้างไว้ตลอดสำหรับคอมเมนต์ของเรา */}
@@ -1186,36 +1183,36 @@ export default function GlobalTasksPage() {
                     </div>
                 </div>
             )}
-             {/* Delete Comment Confirmation Modal */}
-             {commentToDelete && (
-                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60] animate-fade-in">
-                     <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 w-full max-w-sm shadow-2xl flex flex-col items-center text-center">
-                         <div className="w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-500 mb-4">
-                             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                             </svg>
-                         </div>
-                         <h3 className="text-lg font-black text-gray-900 dark:text-white mb-2">Delete Comment?</h3>
-                         <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 font-medium">
-                             Are you sure you want to delete this comment? This action cannot be undone.
-                         </p>
-                         <div className="flex gap-3 w-full">
-                             <button
-                                 onClick={() => setCommentToDelete(null)}
-                                 className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-bold rounded-xl transition-colors"
-                             >
-                                 Cancel
-                             </button>
-                             <button
-                                 onClick={executeDeleteComment}
-                                 className="flex-1 px-4 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition-colors shadow-lg shadow-red-500/30"
-                             >
-                                 Delete
-                             </button>
-                         </div>
-                     </div>
-                 </div>
-             )}
+            {/* Delete Comment Confirmation Modal */}
+            {commentToDelete && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60] animate-fade-in">
+                    <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 w-full max-w-sm shadow-2xl flex flex-col items-center text-center">
+                        <div className="w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-500 mb-4">
+                            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                        </div>
+                        <h3 className="text-lg font-black text-gray-900 dark:text-white mb-2">Delete Comment?</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 font-medium">
+                            Are you sure you want to delete this comment? This action cannot be undone.
+                        </p>
+                        <div className="flex gap-3 w-full">
+                            <button
+                                onClick={() => setCommentToDelete(null)}
+                                className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-bold rounded-xl transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={executeDeleteComment}
+                                className="flex-1 px-4 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition-colors shadow-lg shadow-red-500/30"
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div >
     );
 }
