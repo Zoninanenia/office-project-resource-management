@@ -140,9 +140,20 @@ export default function ForgotPasswordPage() {
             setError("Password must not exceed 50 characters");
             return;
         }
-        const alphanumericRegex = /^[a-zA-Z0-9]+$/; // เฉพาะภาษาอังกฤษ (A-Z, a-z) และตัวเลข (0-9)
+        const alphanumericRegex = /^[a-zA-Z0-9]+$/;
         if (!alphanumericRegex.test(newPassword)) {
             setError("Password can only contain English letters and numbers");
+            return;
+        }
+
+        const isRepeating = /^(.)\1+$/.test(newPassword);
+        const hasLower = /[a-z]/.test(newPassword);
+        const hasUpper = /[A-Z]/.test(newPassword);
+        const hasNumber = /[0-9]/.test(newPassword);
+        const hasMixed = hasLower && hasUpper && hasNumber;
+
+        if (isRepeating || !hasMixed) { //strength 4
+            setError("Password must contain uppercase, lowercase letters and numbers");
             return;
         }
 
@@ -296,31 +307,75 @@ export default function ForgotPasswordPage() {
                                         )}
                                         </button>
                                     </div>
-                                    {newPassword && (
-                                        <div className="flex gap-0.5 mt-2">
-                                            {[1, 2, 3, 4].map((i) => {
-                                                const isAlphanumeric = /^[a-zA-Z0-9]+$/.test(newPassword); //(a-z, A-Z, 0-9) only
-                                                let strength = 0;
-                                                if (!isAlphanumeric || newPassword.length > 50) { // ไม่เกิน 50 ตัว ไม่ใช้อักขระพิเศษ
-                                                    strength = 0;
-                                                } else { 
-                                                    if (newPassword.length >= 12) strength = 4; // 12 ตัวขึ้นไป เขียว
-                                                    else if (newPassword.length >= 10) strength = 3;
-                                                    else if (newPassword.length >= 8) strength = 2; 
-                                                    else if (newPassword.length >= 1) strength = 1;
-                                                }
-                                                const colors = ["bg-red-400", "bg-orange-400", "bg-yellow-400", "bg-green-400"];
-                                                return (
-                                                    <div
-                                                        key={i}
-                                                        className={`h-1 flex-1 rounded-full transition-all duration-300 ${
-                                                            i <= strength ? colors[strength - 1] : "bg-[#e8e5e0]"
-                                                        }`}
-                                                    />
-                                                );
-                                            })}
-                                        </div>
-                                    )}
+                                    {/* {newPassword && (
+                                    <div className="flex gap-0.5 mt-2">
+                                        {[1, 2, 3, 4].map((i) => {
+                                            const isAlphanumeric = /^[a-zA-Z0-9]+$/.test(newPassword); //(a-z, A-Z, 0-9) only
+                                            const isRepeating = /^(.)\1+$/.test(newPassword); // ตรวจสอบว่าทุกตัวซ้ำกันหมด
+                                            let strength = 0;
+
+                                            if (!isAlphanumeric || newPassword.length > 50) {
+                                                strength = 0;
+                                            } else if (isRepeating) {
+                                                strength = 1; // เลข/ตัวอักษรซ้ำทั้งหมด
+                                            } else {
+                                                if (newPassword.length >= 12) strength = 4;// 12 ตัวขึ้นไป เขียว
+                                                else if (newPassword.length >= 10) strength = 3;
+                                                else if (newPassword.length >= 8) strength = 2;
+                                                else if (newPassword.length >= 1) strength = 1;
+                                            }
+
+                                            const colors = ["bg-red-400", "bg-orange-400", "bg-yellow-400", "bg-green-400"];
+                                            return (
+                                                <div
+                                                    key={i}
+                                                    className={`h-1 flex-1 rounded-full transition-all duration-300 ${
+                                                        i <= strength ? colors[strength - 1] : "bg-[#e8e5e0]"
+                                                    }`}
+                                                />
+                                            );
+                                        })}
+                                    </div>
+                                )} */}
+                                {newPassword && (
+                                    <div className="flex gap-0.5 mt-2">
+                                        {[1, 2, 3, 4].map((i) => {
+                                            const isAlphanumeric = /^[a-zA-Z0-9]+$/.test(newPassword); // อนุญาตเฉพาะ a-z, A-Z, 0-9
+                                            const isRepeating = /^(.)\1+$/.test(newPassword);           // ตรวจสอบตัวอักษรซ้ำทั้งหมด เช่น 111111, aaaaaa
+                                            const hasLower = /[a-z]/.test(newPassword);                 // มีตัวพิมพ์เล็ก
+                                            const hasUpper = /[A-Z]/.test(newPassword);                 // มีตัวพิมพ์ใหญ่
+                                            const hasNumber = /[0-9]/.test(newPassword);                // มีตัวเลข
+                                            const hasMixed = hasLower && hasUpper && hasNumber;         // ครบทั้ง 3 ประเภท (lower + upper + number)
+                                            const hasOnlyOneType = [hasLower, hasUpper, hasNumber].filter(Boolean).length === 1; // มีแค่ประเภทเดียว (ตัวเลขล้วน หรือ ตัวอักษรล้วน)
+                                            const hasNumberWithLetter = hasNumber && (hasLower || hasUpper); // มีตัวเลข + ตัวอักษร (lower หรือ upper อย่างใดอย่างหนึ่ง)
+
+                                            let strength = 0;
+
+                                            if (!isAlphanumeric || newPassword.length > 50 || (newPassword.length >= 1 && newPassword.length < 8)) {
+                                                strength = 0; // มีอักขระพิเศษ หรือ เกิน 50 ตัว
+                                            } else if (isRepeating) {
+                                                strength = 1; // ตัวอักษร/ตัวเลขซ้ำทั้งหมด
+                                            } else if (newPassword.length >= 8 && hasMixed) {
+                                                strength = 4; // 8+ ตัว + lower + upper + number ครบ = ปลอดภัย
+                                            } else {
+                                                if (hasOnlyOneType) strength = 2;                                      // ตัวเลขล้วน หรือ ตัวอักษรล้วน
+                                                else if (newPassword.length >= 8 && hasNumberWithLetter) strength = 3; // 8+ ตัว + number + lower/upper
+                                                else if (newPassword.length >= 8) strength = 2;                        // 8+ ตัว แต่ไม่ครบเงื่อนไข
+                                                else if (newPassword.length >= 1) strength = 1;                        // 1-7 ตัว
+                                            }
+
+                                            const colors = ["bg-red-400", "bg-orange-400", "bg-yellow-400", "bg-green-400"];
+                                            return (
+                                                <div
+                                                    key={i}
+                                                    className={`h-1 flex-1 rounded-full transition-all duration-300 ${
+                                                        i <= strength ? colors[strength - 1] : "bg-[#e8e5e0]"
+                                                    }`}
+                                                />
+                                            );
+                                        })}
+                                    </div>
+                                )}
                                 </div>
                                 <p className="mt-4 text-gray-400 text-sm text-center">
                                     Resetting password for <span className="text-gray-800 font-bold">{userEmail || email}</span>

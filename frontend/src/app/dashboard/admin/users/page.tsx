@@ -56,6 +56,21 @@ export default function UserManagementPage() {
 
     const handleCreateUser = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!newUser.username.trim()) {
+            alertError("Invalid Username", { message: "Please enter a username." });
+            return;
+        }
+
+        if (newUser.username.length < 3 || newUser.username.length > 30) {
+            alertError("Invalid Username", { message: "Username must be between 3 and 30 characters." });
+            return;
+        }
+
+        if (!/^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$/.test(newUser.username)) {
+            alertError("Invalid Username", { message: "Username can only contain letters, numbers, dots, hyphens, and underscores." });
+            return;
+        }
+
         const nameRegex = /^[\p{L}\s]+$/u;
         if (newUser.firstName && !nameRegex.test(newUser.firstName)) {
             alertError("Incomplete Form", { message: "First name: Only letters are allowed."});
@@ -89,12 +104,47 @@ export default function UserManagementPage() {
             return;
         }
 
+        const isRepeating = /^(.)\1+$/.test(newUser.password);
+        const hasLower = /[a-z]/.test(newUser.password);
+        const hasUpper = /[A-Z]/.test(newUser.password);
+        const hasNumber = /[0-9]/.test(newUser.password);
+        const hasMixed = hasLower && hasUpper && hasNumber;
+
+        if (isRepeating || !hasMixed) { //strength 4
+        alertError("Invalid Password", { message: "Password must contain uppercase, lowercase letters and numbers" });
+        return;
+        }
+
         if (!newUser.email.trim()) {
-            alertError("Incomplete Form", { message: "Please enter an email address." });
+            alertError("Invalid Email", { message: "Please enter an email address." });
             return;
         }
 
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newUser.email)) {
+        const email = newUser.email.trim();
+        const [localPart, ...domainParts] = email.split("@");
+        const domain = domainParts.join("@");
+
+        if (email.length > 254) {
+            alertError("Invalid Email", { message: "Please enter a valid email address." });
+            return;
+        }
+
+        if (localPart.length > 64) {
+            alertError("Invalid Email", { message: "Please enter a valid email address." });
+            return;
+        }
+
+        if (!/^[a-zA-Z0-9]([a-zA-Z0-9._%+\-]*[a-zA-Z0-9])?$/.test(localPart)) {
+            alertError("Invalid Email", { message: "Please enter a valid email address." });
+            return;
+        }
+
+        if (/\.\./.test(localPart)) {
+            alertError("Invalid Email", { message: "Please enter a valid email address." });
+            return;
+        }
+
+        if (!/^[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/.test(domain)) {
             alertError("Invalid Email", { message: "Please enter a valid email address." });
             return;
         }
@@ -113,6 +163,7 @@ export default function UserManagementPage() {
             });
         } catch (err: any) {
             console.error(err.message || 'Failed to create user');
+            alertError("Failed to create user", { message: "Username or email is already registered." });
         }
     };
 
@@ -276,6 +327,45 @@ export default function UserManagementPage() {
                                             )}
                                         </button>
                                     </div>
+                                    {newUser.password && (
+                                    <div className="flex gap-0.5 mt-2">
+                                        {[1, 2, 3, 4].map((i) => {
+                                            const isAlphanumeric = /^[a-zA-Z0-9]+$/.test(newUser.password); // อนุญาตเฉพาะ a-z, A-Z, 0-9
+                                            const isRepeating = /^(.)\1+$/.test(newUser.password);           // ตรวจสอบตัวอักษรซ้ำทั้งหมด เช่น 111111, aaaaaa
+                                            const hasLower = /[a-z]/.test(newUser.password);                 // มีตัวพิมพ์เล็ก
+                                            const hasUpper = /[A-Z]/.test(newUser.password);                 // มีตัวพิมพ์ใหญ่
+                                            const hasNumber = /[0-9]/.test(newUser.password);                // มีตัวเลข
+                                            const hasMixed = hasLower && hasUpper && hasNumber;         // ครบทั้ง 3 ประเภท (lower + upper + number)
+                                            const hasOnlyOneType = [hasLower, hasUpper, hasNumber].filter(Boolean).length === 1; // มีแค่ประเภทเดียว (ตัวเลขล้วน หรือ ตัวอักษรล้วน)
+                                            const hasNumberWithLetter = hasNumber && (hasLower || hasUpper); // มีตัวเลข + ตัวอักษร (lower หรือ upper อย่างใดอย่างหนึ่ง)
+
+                                            let strength = 0;
+
+                                            if (!isAlphanumeric || newUser.password.length > 50 || (newUser.password.length >= 1 && newUser.password.length < 8)) {
+                                                strength = 0; // มีอักขระพิเศษ หรือ เกิน 50 ตัว
+                                            } else if (isRepeating) {
+                                                strength = 1; // ตัวอักษร/ตัวเลขซ้ำทั้งหมด
+                                            } else if (newUser.password.length >= 8 && hasMixed) {
+                                                strength = 4; // 8+ ตัว + lower + upper + number ครบ = ปลอดภัย
+                                            } else {
+                                                if (hasOnlyOneType) strength = 2;                                      // ตัวเลขล้วน หรือ ตัวอักษรล้วน
+                                                else if (newUser.password.length >= 8 && hasNumberWithLetter) strength = 3; // 8+ ตัว + number + lower/upper
+                                                else if (newUser.password.length >= 8) strength = 2;                        // 8+ ตัว แต่ไม่ครบเงื่อนไข
+                                                else if (newUser.password.length >= 1) strength = 1;                        // 1-7 ตัว
+                                            }
+
+                                            const colors = ["bg-red-400", "bg-orange-400", "bg-yellow-400", "bg-green-400"];
+                                            return (
+                                                <div
+                                                    key={i}
+                                                    className={`h-1 flex-1 rounded-full transition-all duration-300 ${
+                                                        i <= strength ? colors[strength - 1] : "bg-[#e8e5e0]"
+                                                    }`}
+                                                />
+                                            );
+                                        })}
+                                    </div>
+                                )}
                                 </div>
                             </div>
 

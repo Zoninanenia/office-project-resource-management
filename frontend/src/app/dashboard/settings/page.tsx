@@ -116,6 +116,17 @@ export default function SettingsPage() {
             alertError("Invalid Password", { message: "Password can only contain English letters and numbers."});
             return;
         }
+
+        const isRepeating = /^(.)\1+$/.test(password);
+        const hasLower = /[a-z]/.test(password);
+        const hasUpper = /[A-Z]/.test(password);
+        const hasNumber = /[0-9]/.test(password);
+        const hasMixed = hasLower && hasUpper && hasNumber;
+
+        if (isRepeating || !hasMixed) { //strength 4
+            alertError("Invalid Password", { message: "Password must contain uppercase, lowercase letters and numbers."});
+            return;
+        }
         try {
             await api.put(`/users/${userId}/newpassword/`, { password });
             alertSuccess("Saved Successfully", { message: "Changes have been saved." });
@@ -271,7 +282,7 @@ export default function SettingsPage() {
                                 </div>
 
                                 {/* Strength Bar */}
-                                {password && (
+                                {/* {password && (
                                     <div className="flex gap-1 mt-0.5">
                                         {[1, 2, 3, 4].map((i) => {
                                             const isAlphanumeric = /^[a-zA-Z0-9]+$/.test(password); //(a-z, A-Z, 0-9) only
@@ -284,6 +295,45 @@ export default function SettingsPage() {
                                                 else if (password.length >= 8) strength = 2; 
                                                 else if (password.length >= 1) strength = 1;
                                             }
+                                            const colors = ["bg-red-400", "bg-orange-400", "bg-yellow-400", "bg-green-400"];
+                                            return (
+                                                <div
+                                                    key={i}
+                                                    className={`h-1 flex-1 rounded-full transition-all duration-300 ${
+                                                        i <= strength ? colors[strength - 1] : "bg-[#e8e5e0]"
+                                                    }`}
+                                                />
+                                            );
+                                        })}
+                                    </div>
+                                )} */}
+                                {password && (
+                                    <div className="flex gap-0.5 mt-2">
+                                        {[1, 2, 3, 4].map((i) => {
+                                            const isAlphanumeric = /^[a-zA-Z0-9]+$/.test(password); // อนุญาตเฉพาะ a-z, A-Z, 0-9
+                                            const isRepeating = /^(.)\1+$/.test(password);           // ตรวจสอบตัวอักษรซ้ำทั้งหมด เช่น 111111, aaaaaa
+                                            const hasLower = /[a-z]/.test(password);                 // มีตัวพิมพ์เล็ก
+                                            const hasUpper = /[A-Z]/.test(password);                 // มีตัวพิมพ์ใหญ่
+                                            const hasNumber = /[0-9]/.test(password);                // มีตัวเลข
+                                            const hasMixed = hasLower && hasUpper && hasNumber;         // ครบทั้ง 3 ประเภท (lower + upper + number)
+                                            const hasOnlyOneType = [hasLower, hasUpper, hasNumber].filter(Boolean).length === 1; // มีแค่ประเภทเดียว (ตัวเลขล้วน หรือ ตัวอักษรล้วน)
+                                            const hasNumberWithLetter = hasNumber && (hasLower || hasUpper); // มีตัวเลข + ตัวอักษร (lower หรือ upper อย่างใดอย่างหนึ่ง)
+
+                                            let strength = 0;
+
+                                            if (!isAlphanumeric || password.length > 50 || (password.length >= 1 && password.length < 8)) {
+                                                strength = 0; // มีอักขระพิเศษ หรือ เกิน 50 ตัว
+                                            } else if (isRepeating) {
+                                                strength = 1; // ตัวอักษร/ตัวเลขซ้ำทั้งหมด
+                                            } else if (password.length >= 8 && hasMixed) {
+                                                strength = 4; // 8+ ตัว + lower + upper + number ครบ = ปลอดภัย
+                                            } else {
+                                                if (hasOnlyOneType) strength = 2;                                      // ตัวเลขล้วน หรือ ตัวอักษรล้วน
+                                                else if (password.length >= 8 && hasNumberWithLetter) strength = 3; // 8+ ตัว + number + lower/upper
+                                                else if (password.length >= 8) strength = 2;                        // 8+ ตัว แต่ไม่ครบเงื่อนไข
+                                                else if (password.length >= 1) strength = 1;                        // 1-7 ตัว
+                                            }
+
                                             const colors = ["bg-red-400", "bg-orange-400", "bg-yellow-400", "bg-green-400"];
                                             return (
                                                 <div

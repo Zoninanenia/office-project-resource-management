@@ -13,10 +13,12 @@ export default function RegisterPage() {
         password: '',
         firstName: '',
         lastName: '',
+        confirmPassword: '',
     });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [showPass, setShowPass] = useState(false);
+    const [showConfirmPass, setShowConfirmPass] = useState(false);
 
     useEffect(() => {
         setError('');
@@ -27,6 +29,21 @@ export default function RegisterPage() {
         setLoading(true);
         setError('');
         try {
+            if (!formData.username.trim()) {
+                setError("Please enter a username.");
+                return;
+            }
+
+            if (formData.username.length < 3 || formData.username.length > 30) {
+                setError("Username must be between 3 and 30 characters.");
+                return;
+            }
+
+            if (!/^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$/.test(formData.username)) {
+                setError("Username can only contain letters, numbers, dots, hyphens, and underscores.");
+                return;
+            }
+
             const nameRegex = /^[\p{L}\s]+$/u;
             if (formData.firstName && !nameRegex.test(formData.firstName)) {
                 setError("First name: Only letters are allowed.");
@@ -60,20 +77,60 @@ export default function RegisterPage() {
                 return;
             }
 
-            if (!formData.email.trim()) {
-                setError("Please enter an email address." );
+            const isRepeating = /^(.)\1+$/.test(formData.password);
+            const hasLower = /[a-z]/.test(formData.password);
+            const hasUpper = /[A-Z]/.test(formData.password);
+            const hasNumber = /[0-9]/.test(formData.password);
+            const hasMixed = hasLower && hasUpper && hasNumber;
+
+            if (isRepeating || !hasMixed) { //strength 4
+                setError("Password must contain uppercase, lowercase letters and numbers.");
+                return;
+            }
+            if (formData.password !== formData.confirmPassword) {
+                 setError("Passwords do not match.");
                 return;
             }
 
-            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+            if (!formData.email.trim()) {
+                setError("Please enter an email address.");
+                return;
+            }
+
+            const email = formData.email.trim();
+            const [localPart, ...domainParts] = email.split("@");
+            const domain = domainParts.join("@");
+
+            if (email.length > 254) {
                 setError("Please enter a valid email address.");
                 return;
             }
+
+            if (localPart.length > 64) {
+                setError("Please enter a valid email address.");
+                return;
+            }
+
+            if (!/^[a-zA-Z0-9]([a-zA-Z0-9._%+\-]*[a-zA-Z0-9])?$/.test(localPart)) {
+                setError("Please enter a valid email address.");
+                return;
+            }
+
+            if (/\.\./.test(localPart)) {
+                setError("Please enter a valid email address.");
+                return;
+            }
+
+            if (!/^[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/.test(domain)) {
+                setError("Please enter a valid email address.");
+                return;
+            }
+
             await api.post('/auth/register', formData);
             router.push('/login');
         } catch (err: any) {
             console.error(err.message || 'Registration failed');
-            // setError(err.message || 'Registration failed');
+            setError('Username or email is already registered.');
         } finally {
             setLoading(false);
         }
@@ -168,6 +225,7 @@ export default function RegisterPage() {
                             className="w-full px-5 py-3 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-cyan-500 focus:bg-white text-gray-800 placeholder-gray-400 focus:outline-none transition-all duration-300 shadow-sm font-medium"
                             required
                         /> */}
+
                         <div className="relative"> 
                             <input
                             type={showPass ? "text" : "password"}
@@ -196,6 +254,38 @@ export default function RegisterPage() {
                                 <line x1="1" y1="1" x2="23" y2="23" />
                                 </svg>
                             )}
+                            </button>
+                        </div>
+                    
+                        <label className="block text-gray-700 text-sm font-bold mb-2 ml-1 mt-5" htmlFor="password">Confirm Password</label>
+                        {/* Confirm Password */}
+                        <div className="relative">
+                            <input
+                                type={showConfirmPass ? "text" : "password"}
+                                placeholder="Confirm Password"
+                                className="w-full px-5 py-4 pr-12 rounded-2xl bg-gray-50 border-2 border-gray-100 focus:border-cyan-500 focus:bg-white text-gray-800 placeholder-gray-400 focus:outline-none transition-all duration-300 shadow-sm font-medium"
+                                required
+                                value={formData.confirmPassword}
+                                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                            />
+
+                            <button
+                                type="button"
+                                onClick={() => setShowConfirmPass(!showConfirmPass)}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-[#a09c96] hover:text-[#5a5650] transition-colors focus:outline-none"
+                            >
+                                {showConfirmPass ? (
+                                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                        <circle cx="12" cy="12" r="3" />
+                                    </svg>
+                                ) : (
+                                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                                        <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                                        <line x1="1" y1="1" x2="23" y2="23" />
+                                    </svg>
+                                )}
                             </button>
                         </div>
                         
