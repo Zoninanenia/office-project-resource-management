@@ -220,14 +220,14 @@ export default function DashboardPage() {
                                 )}
 
                                 {/* Issues - Team Leader และ Worker เห็น */}
-                                {(userRole === 'team_leader' || userRole === 'worker') && (
+                                {/* {(userRole === 'team_leader' || userRole === 'worker') && (
                                     <Link href="/dashboard/issues" className="w-full text-left px-4 py-3 bg-gray-700/50 hover:bg-gray-700 rounded-xl transition-colors flex items-center gap-3 group block">
                                         <div className="p-2 bg-brand-sage/20 text-brand-sage rounded-lg group-hover:bg-brand-sage group-hover:text-white transition-all">
                                             <BugIcon className="w-5 h-5" />
                                         </div>
                                         <span className="font-bold">Issues</span>
                                     </Link>
-                                )}
+                                )} */}
 
                                 {/* Projects - PM เห็น */}
                                 {userRole === 'project_manager' && (

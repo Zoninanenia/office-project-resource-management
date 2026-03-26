@@ -183,7 +183,7 @@ export default function DashboardLayout({
             <>
               <TooltipNavItem href="/dashboard" icon={<DashboardIcon />} label="Home" active={isActive('/dashboard')} expanded={isSidebarExpanded} />
               <TooltipNavItem href="/dashboard/tasks" icon={<ListIcon />} label="My Tasks" active={isActive('/dashboard/tasks')} expanded={isSidebarExpanded} />
-              <TooltipNavItem href="/dashboard/issues" icon={<BugIcon />} label="Issues" active={isActive('/dashboard/issues')} expanded={isSidebarExpanded} />
+              {/* <TooltipNavItem href="/dashboard/issues" icon={<BugIcon />} label="Issues" active={isActive('/dashboard/issues')} expanded={isSidebarExpanded} /> */}
 
               <div className="my-2 border-t border-gray-800 w-full"></div>
             </>
@@ -197,7 +197,7 @@ export default function DashboardLayout({
               {userRole === 'project_manager' && (
                 <TooltipNavItem href="/dashboard/wages" icon={<WageIcon />} label="Wages" active={isActive('/dashboard/wages')} expanded={isSidebarExpanded} />
               )}
-              <TooltipNavItem href="/dashboard/issues" icon={<BugIcon />} label="Issues" active={isActive('/dashboard/issues')} expanded={isSidebarExpanded} />
+              {/* <TooltipNavItem href="/dashboard/issues" icon={<BugIcon />} label="Issues" active={isActive('/dashboard/issues')} expanded={isSidebarExpanded} /> */}
 
               <div className="my-2 border-t border-gray-800 w-full"></div>
             </>
